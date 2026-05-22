@@ -14,7 +14,7 @@
 
   <!-- Driver search: sets mcp_online / mcp_offline tokens for the status badge -->
   <search>
-    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval online=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(online) as online</query>
+    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval o=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(o) as app_online | appendcols [ search `internal_index` sourcetype=splunkd_access earliest=-15m latest=now | lookup mcp_user_agents useragent_pattern AS useragent OUTPUT client_label | where isnotnull(client_label) OR like(uri_path,"%/services/mcp%") | stats count as rest_hits ] | eval online=if(coalesce(app_online,0)=1 OR coalesce(rest_hits,0)>0,1,0) | fields online</query>
     <refresh>60s</refresh>
     <refreshType>delay</refreshType>
     <done>
@@ -31,7 +31,7 @@
 
   <row>
     <panel>
-      <title>Splunk MCP Server — Status</title>
+      <title>MCP Server — Status (any MCP: official app or detected client)</title>
       <html depends="$mcp_online$">
         <div style="background-color:#53a051;color:#ffffff;padding:30px;border-radius:8px;text-align:center;font-size:30px;font-weight:bold;">&#10003;&#160; ONLINE</div>
       </html>
@@ -43,7 +43,7 @@
       <title>Last MCP activity</title>
       <single>
         <search>
-          <query>search index=_internal sourcetype=splunkd_access uri_path=*/services/mcp* earliest=-24h | stats count as c latest(_time) as last_seen | eval mins=if(c=0,-1,round((now()-last_seen)/60)) | fields mins</query>
+          <query>search `internal_index` sourcetype=splunkd_access earliest=-24h | lookup mcp_user_agents useragent_pattern AS useragent OUTPUT client_label | where isnotnull(client_label) OR like(uri_path,"%/services/mcp%") | stats count as c latest(_time) as last_seen | eval mins=if(c=0,-1,round((now()-last_seen)/60)) | fields mins</query>
           <earliest>-24h</earliest>
           <latest>now</latest>
           <refresh>30s</refresh>
