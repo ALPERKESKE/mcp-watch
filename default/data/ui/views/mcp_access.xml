@@ -1,14 +1,23 @@
 <dashboard version="1.1">
   <label>MCP Access &amp; Tools</label>
-  <description>Who can call MCP tools, which tools are enabled, and which user actually uses what.</description>
+  <description>Which accounts act as MCP clients, what they can reach, and which tools they use. Works for the official Splunk MCP Server (capability model) and for custom / community MCP servers (RBAC + user-agent detection).</description>
+
+  <fieldset submitButton="false">
+    <input type="time" token="tr">
+      <label>Time range</label>
+      <default><earliest>-24h@h</earliest><latest>now</latest></default>
+    </input>
+  </fieldset>
 
   <row>
     <panel>
-      <title>Users who can call MCP tools (mcp_tool_execute)</title>
+      <title>MCP accounts — capability-granted or detected by user-agent</title>
       <table>
         <search>
-          <query>| rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | eval roles=mvjoin(roles,", ") | table title realname roles</query>
-          <refresh>5m</refresh>
+          <query>| rest /services/authentication/users | eval user=title, roles=mvjoin('roles',", "), cap=if(match(mvjoin('capabilities'," "),"mcp_tool_execute"),"mcp_tool_execute",null()) | fields user roles cap | join type=left user [ search `mcp_rest_clients` | stats count as rest_calls values(client_label) as detected_as by user ] | where isnotnull(cap) OR isnotnull(detected_as) | eval detected_via=mvjoin(mvappend(if(isnotnull(cap),"capability",null()),if(isnotnull(detected_as),"user-agent",null())),", ") | table user roles detected_as detected_via rest_calls | sort - rest_calls</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>2m</refresh>
           <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
@@ -18,13 +27,13 @@
     <panel>
       <title>Access model</title>
       <html>
-        <div style="padding:14px;font-size:13px;line-height:1.6;">
-          <b>How MCP tool access works here:</b>
+        <div style="padding:14px;font-size:12.5px;line-height:1.6;">
+          <b>Two ways an account is treated as an MCP client:</b>
           <ul>
-            <li><b>Tool enablement is global</b> — every tool in the catalog is enabled for all MCP users (Splunk_MCP_Server <code>mcp_tools_enabled</code> KV store).</li>
-            <li><b>Per-user access</b> is gated by the <code>mcp_tool_execute</code> capability (granted via role).</li>
-            <li>Each tool runs with the user's own Splunk RBAC, so the real per-user boundary is the <b>searchable index scope</b> (table below).</li>
+            <li><b>Official Splunk MCP Server</b> — the role grants the <code>mcp_tool_execute</code> capability; tools come from the catalog and the <b>User × Tool matrix</b> shows ✓ granted / ✗ denied (from <code>mcp_tool_denied.csv</code>).</li>
+            <li><b>Custom / community MCP</b> — no such capability; the account is detected by its client <b>user-agent</b> (<code>mcp_user_agents.csv</code>) and tools are <b>inferred from REST endpoints</b>. The matrix then shows ✓ where the account actually used a tool.</li>
           </ul>
+          Each tool always runs with the account's own Splunk RBAC — the real data boundary is the searchable index scope (below).
         </div>
       </html>
     </panel>
@@ -32,12 +41,12 @@
 
   <row>
     <panel>
-      <title>User × Tool access matrix  (✓ = granted · ✗ = denied)</title>
+      <title>User × Tool matrix  (official: ✓ granted / ✗ denied · custom: ✓ used)</title>
       <table>
         <search>
-          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | stats values(title) as user ] | where isnotnull(user) | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | chart limit=0 values(cell) over user by tool</query>
-          <earliest>-24h</earliest>
-          <latest>now</latest>
+          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | stats values(title) as user ] | where isnotnull(user) | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | append [ search `mcp_rest_clients` | `mcp_rest_tool_infer` | stats count by user inferred_tool | rename inferred_tool as tool | eval cell="✓" ] | chart limit=0 values(cell) over user by tool</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
           <refresh>2m</refresh>
           <refreshType>delay</refreshType>
         </search>
@@ -49,15 +58,14 @@
     </panel>
   </row>
 
-
   <row>
     <panel>
-      <title>Tool usage by user (24h)</title>
+      <title>Tool usage by account (inferred from REST)</title>
       <chart>
         <search>
-          <query>search `mcp_audit_searches` | rex field=_raw "provenance=\"MCP:Splunk_MCP_Server:(?&lt;tool&gt;[^\"]+)\"" | eval tool=coalesce(tool,"(unknown)") | chart count over user by tool</query>
-          <earliest>-24h</earliest>
-          <latest>now</latest>
+          <query>search `mcp_rest_clients` | `mcp_rest_tool_infer` | chart limit=0 count over user by inferred_tool</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
           <refresh>2m</refresh>
           <refreshType>delay</refreshType>
         </search>
@@ -67,63 +75,17 @@
       </chart>
     </panel>
     <panel>
-      <title>Searchable index scope per MCP role</title>
+      <title>Searchable index scope per MCP account</title>
       <table>
         <search>
-          <query>| rest /services/authorization/roles | search capabilities=mcp_tool_execute | eval searchable_indexes=mvjoin(srchIndexesAllowed,", ") | table title searchable_indexes | sort title</query>
+          <query>| rest /services/authentication/users | eval user=title | fields user roles | mvexpand roles | search [ search `mcp_rest_clients` | stats count by user | fields user | append [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | rename title as user | fields user ] | dedup user ] | join type=left roles [ | rest /services/authorization/roles | eval roles=title, idx=mvjoin('srchIndexesAllowed',", ") | fields roles idx ] | stats values(roles) as roles values(idx) as searchable_indexes by user</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
           <refresh>5m</refresh>
           <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
       </table>
-    </panel>
-  </row>
-
-  <row>
-    <panel>
-      <html>
-        <div style="padding:12px;font-size:13px;line-height:1.6;border-top:2px solid #3c444d;margin-top:8px;">
-          <b>Community / non-official MCP — access by account</b> (no <code>mcp_tool_execute</code> capability required).
-          The panels above use the official Splunk MCP Server's capability model and stay empty where that app isn't installed.
-          The panels below derive the access model from the <b>connecting account's RBAC</b> and <b>REST-detected tool usage</b>
-          (user-agent match + endpoint inference) — so it works for custom MCP servers / federation gateways too.
-        </div>
-      </html>
-    </panel>
-  </row>
-
-  <row>
-    <panel>
-      <title>Detected MCP accounts &amp; their roles (RBAC-based)</title>
-      <table>
-        <search>
-          <query>`mcp_rest_clients` | stats count as rest_calls values(client_label) as detected_as values(useragent) as user_agents by user | join type=left user [ | rest /services/authentication/users | eval user=title, roles=mvjoin('roles',", ") | fields user realname roles ] | table user detected_as roles rest_calls user_agents | sort - rest_calls</query>
-          <earliest>-24h</earliest>
-          <latest>now</latest>
-          <refresh>2m</refresh>
-          <refreshType>delay</refreshType>
-        </search>
-        <option name="drilldown">none</option>
-        <option name="count">20</option>
-      </table>
-    </panel>
-  </row>
-
-  <row>
-    <panel>
-      <title>Account × inferred-tool matrix (REST-based — works for any MCP)</title>
-      <chart>
-        <search>
-          <query>`mcp_rest_clients` | `mcp_rest_tool_infer` | chart limit=0 count over user by inferred_tool</query>
-          <earliest>-24h</earliest>
-          <latest>now</latest>
-          <refresh>2m</refresh>
-          <refreshType>delay</refreshType>
-        </search>
-        <option name="charting.chart">bar</option>
-        <option name="charting.chart.stackMode">stacked</option>
-        <option name="charting.legend.placement">right</option>
-      </chart>
     </panel>
   </row>
 </dashboard>
