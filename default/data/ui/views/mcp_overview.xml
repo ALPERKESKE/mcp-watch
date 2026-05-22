@@ -14,7 +14,7 @@
 
   <!-- Driver search: sets mcp_online / mcp_offline tokens for the status badge -->
   <search>
-    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval o=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(o) as app_online | appendcols [ | inputlookup mcp_heartbeat | eval age=now()-last_seen | where age<=120 | stats count as fresh_hb ] | eval online=if(coalesce(app_online,0)=1 OR coalesce(fresh_hb,0)>0,1,0) | fields online</query>
+    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval o=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(o) as app_online | appendcols [ | inputlookup mcp_heartbeat | eval age=now()-last_seen | where age&lt;=120 | stats count as fresh_hb ] | eval online=if(coalesce(app_online,0)=1 OR coalesce(fresh_hb,0)>0,1,0) | fields online</query>
     <refresh>60s</refresh>
     <refreshType>delay</refreshType>
     <done>
