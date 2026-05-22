@@ -1,4 +1,5 @@
 <nav search_view="search" color="#65A637">
+  <view name="getting_started" />
   <view name="mcp_overview" default="true" />
   <view name="activity_timeline" />
   <view name="quality_hygiene" />

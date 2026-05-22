@@ -1,0 +1,100 @@
+<dashboard version="1.1">
+  <label>Getting Started</label>
+  <description>First-run setup &amp; configuration guide for MCP-Watch.</description>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:16px;font-size:14px;line-height:1.7;">
+          <h2 style="margin-top:0;">Welcome to MCP-Watch 👋</h2>
+          MCP-Watch reads only Splunk's built-in <code>_audit</code> / <code>_internal</code> data — there is nothing to ingest.
+          To start seeing data you just need to tell it <b>which account(s) your MCP server uses</b>. Follow the steps below;
+          the panels on this page show your current configuration and whether data is flowing.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Step 1 — Who is your MCP agent? (run this to find the user)</title>
+      <table>
+        <search>
+          <query>`audit_index` action=search info=granted | stats count as searches, latest(_time) as last by user | sort - searches | head 10 | convert ctime(last) | rename last as last_search</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Currently watched users (mcp_users.csv)</title>
+      <table>
+        <search>
+          <query>| inputlookup mcp_users.csv</query>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:16px;font-size:13.5px;line-height:1.7;">
+          <b>Step 2 — Add your MCP user(s) to the lookup.</b> Two ways:
+          <ul>
+            <li><b>Splunk UI:</b> Settings → Lookups → <a href="/manager/mcp_watch/data/lookup-table-files">Lookup table files</a> → edit <code>mcp_users.csv</code> (needs the Lookup Editor, or edit on disk).</li>
+            <li><b>SPL (no extra app):</b> run once in Search —
+              <br/><code>| inputlookup mcp_users.csv | append [| makeresults | eval user="YOUR_MCP_USER", role="mcp_agent", description="my MCP server" | fields user role description] | outputlookup mcp_users.csv</code></li>
+          </ul>
+          <b>Step 3 — Custom / non-official MCP server?</b> If your MCP doesn't use the official Splunk MCP Server,
+          add its client <b>user-agent</b> pattern to <code>mcp_user_agents.csv</code> so the
+          <b>MCP Detection (REST)</b> dashboard catches it.
+          <br/><br/>
+          <b>Step 4 — Distributed / Search Head Cluster?</b> Deploy this app via your <b>Deployer</b>
+          (<code>$SPLUNK_HOME/etc/shcluster/apps/</code> → <code>splunk apply shcluster-bundle</code>), not directly on each search head.
+          <br/>
+          <b>Splunk Cloud with remapped indexes?</b> Override the <code>audit_index</code> / <code>internal_index</code> macros in <code>local/macros.conf</code>.
+          <br/><br/>
+          Then wait ~5 minutes (scheduled searches) and open <b>MCP Overview</b>. Full docs: see the app's <code>README.md</code>.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Search activity from watched users (24h)</title>
+      <single>
+        <search>
+          <query>`mcp_audit_searches` | stats count</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0xdc4e41","0x53a051"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="useColors">1</option>
+        <option name="underLabel">events — 0 means no watched user is configured / active</option>
+      </single>
+    </panel>
+    <panel>
+      <title>MCP/agent clients detected by user-agent (24h)</title>
+      <single>
+        <search>
+          <query>`mcp_rest_clients` | stats dc(useragent) as clients</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0xdc4e41","0x53a051"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="useColors">1</option>
+        <option name="underLabel">distinct client user-agents (REST-side detection)</option>
+      </single>
+    </panel>
+  </row>
+</dashboard>
