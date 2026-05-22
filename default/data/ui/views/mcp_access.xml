@@ -78,4 +78,52 @@
       </table>
     </panel>
   </row>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:12px;font-size:13px;line-height:1.6;border-top:2px solid #3c444d;margin-top:8px;">
+          <b>Community / non-official MCP — access by account</b> (no <code>mcp_tool_execute</code> capability required).
+          The panels above use the official Splunk MCP Server's capability model and stay empty where that app isn't installed.
+          The panels below derive the access model from the <b>connecting account's RBAC</b> and <b>REST-detected tool usage</b>
+          (user-agent match + endpoint inference) — so it works for custom MCP servers / federation gateways too.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Detected MCP accounts &amp; their roles (RBAC-based)</title>
+      <table>
+        <search>
+          <query>`mcp_rest_clients` | stats count as rest_calls values(client_label) as detected_as values(useragent) as user_agents by user | join type=left user [ | rest /services/authentication/users | eval user=title, roles=mvjoin('roles',", ") | fields user realname roles ] | table user detected_as roles rest_calls user_agents | sort - rest_calls</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+          <refresh>2m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Account × inferred-tool matrix (REST-based — works for any MCP)</title>
+      <chart>
+        <search>
+          <query>`mcp_rest_clients` | `mcp_rest_tool_infer` | chart limit=0 count over user by inferred_tool</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+          <refresh>2m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+  </row>
 </dashboard>
