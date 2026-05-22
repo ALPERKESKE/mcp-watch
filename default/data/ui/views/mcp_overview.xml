@@ -3,7 +3,7 @@
   <description>At-a-glance picture of MCP / AI-agent activity in this Splunk instance over the last 24 hours.</description>
 
   <!--
-    Performance pattern: a single Base Search drives every panel below.
+    Performance pattern: a single Base Search drives the KPI panels below.
     Splunk dispatches the heavy `mcp_audit_searches` once; each panel post-processes.
   -->
   <search id="base_24h">
@@ -12,33 +12,24 @@
     <latest>now</latest>
   </search>
 
-  <!-- Driver search: sets mcp_online / mcp_offline tokens for the status badge -->
-  <search>
-    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval o=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(o) as app_online | appendcols [ | inputlookup mcp_heartbeat | eval age=now()-last_seen | where age&lt;=120 | stats count as fresh_hb ] | eval online=if(coalesce(app_online,0)=1 OR coalesce(fresh_hb,0)>0,1,0) | fields online</query>
-    <refresh>60s</refresh>
-    <refreshType>delay</refreshType>
-    <done>
-      <condition match="$result.online$==1">
-        <set token="mcp_online">1</set>
-        <unset token="mcp_offline"></unset>
-      </condition>
-      <condition>
-        <set token="mcp_offline">1</set>
-        <unset token="mcp_online"></unset>
-      </condition>
-    </done>
-  </search>
-
   <row>
     <panel>
-      <title>MCP Server — Status (any MCP: official app or detected client)</title>
-      <html depends="$mcp_online$">
-        <div style="background-color:#53a051;color:#ffffff;padding:10px;border-radius:6px;text-align:center;font-size:18px;font-weight:bold;">&#10003;&#160; ONLINE</div>
-      </html>
-      <html depends="$mcp_offline$">
-        <div style="background-color:#dc4e41;color:#ffffff;padding:10px;border-radius:6px;text-align:center;font-size:18px;font-weight:bold;">&#10007;&#160; OFFLINE</div>
-      </html>
+      <title>MCP liveness — heartbeats (UP = heartbeat within 120s)</title>
+      <table>
+        <search>
+          <query>| `mcp_heartbeats` | eval status=if(fresh=1,"● UP","○ STALE"), last_heartbeat=strftime(last_seen,"%Y-%m-%d %H:%M:%S") | table mcp_id status kind host age_seconds last_heartbeat | sort mcp_id</query>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"● UP":#53a051,"○ STALE":#dc4e41}</colorPalette>
+        </format>
+      </table>
     </panel>
+  </row>
+
+  <row>
     <panel>
       <title>Last MCP activity</title>
       <single>
@@ -78,9 +69,6 @@
         <option name="drilldown">none</option>
       </single>
     </panel>
-  </row>
-
-  <row>
     <panel>
       <title>Risk score (24h)</title>
       <single>
@@ -102,23 +90,6 @@
         </search>
         <option name="drilldown">none</option>
       </single>
-    </panel>
-  </row>
-
-  <row>
-    <panel>
-      <title>MCP liveness — heartbeats (UP = heartbeat within 120s)</title>
-      <table>
-        <search>
-          <query>| `mcp_heartbeats` | eval status=if(fresh=1,"● UP","○ STALE"), last_heartbeat=strftime(last_seen,"%Y-%m-%d %H:%M:%S") | table mcp_id status kind host age_seconds last_heartbeat | sort mcp_id</query>
-          <refresh>30s</refresh>
-          <refreshType>delay</refreshType>
-        </search>
-        <option name="drilldown">none</option>
-        <format type="color" field="status">
-          <colorPalette type="map">{"● UP":#53a051,"○ STALE":#dc4e41}</colorPalette>
-        </format>
-      </table>
     </panel>
   </row>
 
