@@ -8,7 +8,7 @@ When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Pr
 - **What's new since 1.0:**
   - **Multi-signal detection** — also catches **custom / community / non-official MCP servers** (no official provenance, shared account, generic user-agent) via REST-side user-agent matching + endpoint-based tool inference. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup.
   - **Unified Access &amp; Tools** — the access model works with the official `mcp_tool_execute` capability AND, where that's absent, falls back to the connecting account's **RBAC + REST-detected tool usage** (so custom MCPs aren't blank).
-  - **Liveness heartbeats** — the status badge reflects a **true up/down signal** (official app enabled OR a fresh heartbeat in the `mcp_heartbeat` KV collection), decoupled from query activity.
+  - **Liveness heartbeats** — a dedicated **MCP liveness** panel shows per-MCP up/down, decoupled from query activity. The official server is auto-heartbeated; custom MCPs send their own heartbeat into the `mcp_heartbeat` KV collection.
   - **Getting Started** dashboard — in-app setup guide + "is data flowing?" checks.
 - **Dependencies:** none — no CIM, no Add-on Builder, no companion apps. Reads built-in `_audit` / `_internal` in place.
 - **Compatibility:** Splunk Enterprise & Cloud 9.x / 10.x.
@@ -42,13 +42,12 @@ In-app onboarding: how to populate `mcp_users.csv`, the current configuration, a
 ### 1 · MCP Overview — at-a-glance picture (last 24h)
 | Panel | What it shows |
 |-------|---------------|
-| **MCP Server — Status** | Green **✓ ONLINE** / red **✗ OFFLINE** badge — true liveness: official MCP Server app enabled **OR** a fresh heartbeat (see *Liveness & heartbeats*). Re-checked every ~60s, decoupled from query volume. |
+| **MCP liveness — heartbeats** | *(first row)* Per-MCP `● UP` / `○ STALE` from the `mcp_heartbeat` KV collection — the primary status indicator (see *Liveness & heartbeats*). |
 | **Last MCP activity** | Minutes since the last MCP/agent REST call (green < 15m, amber, red). |
 | **Queries (last 24h)** | Total SPL queries run by MCP users. |
 | **Active MCP users** | Distinct MCP agents seen. |
 | **Risk score (24h)** | Sum of every query's risk score (see *Risk scoring*). |
 | **Unique SPL bodies** | Distinct queries (deduplication signal). |
-| **MCP liveness — heartbeats** | Per-MCP `● UP` / `○ STALE` from the `mcp_heartbeat` KV collection. |
 | **Query volume — 15-min buckets** | Timechart of query rate. |
 | **Top 5 SPL bodies (24h)** | The most frequently run agent queries. |
 
@@ -97,12 +96,10 @@ Catches MCP/agent clients that v1.0's provenance-only logic missed (custom / com
 
 ## Liveness &amp; heartbeats
 
-The **MCP Server — Status** badge on *MCP Overview* shows a true up/down signal, **independent of query activity**:
+The **MCP liveness — heartbeats** panel (first row of *MCP Overview*) shows per-MCP up/down, **independent of query activity** — `● UP` when a fresh heartbeat (≤ 120s old) exists in the `mcp_heartbeat` KV collection, otherwise `○ STALE`.
 
-- **Official Splunk MCP Server** → ONLINE when the app is installed and enabled (checked every ~60s).
-- **Custom / external MCP** → ONLINE when a **fresh heartbeat** (≤ 120s old) exists in the `mcp_heartbeat` KV collection.
-
-Because an external MCP runs outside Splunk, the only reliable liveness signal is a heartbeat the MCP (or a sidecar next to it) sends. Have it upsert one row per MCP every ~60s — for example:
+- **Official Splunk MCP Server** → auto-heartbeated for you: the scheduled search *MCP-Watch - Heartbeat - Official MCP Server* writes a heartbeat every 60s while the app is enabled. No setup needed.
+- **Custom / external MCP** → must send its own heartbeat (it runs outside Splunk, so that is the only reliable liveness signal). Have the MCP, or a sidecar next to it, upsert one row every ~60s — for example:
 
 ```bash
 curl -sk -u <user>:<pass> \
@@ -111,7 +108,7 @@ curl -sk -u <user>:<pass> \
   -d "[{\"_key\":\"my-mcp\",\"mcp_id\":\"my-mcp\",\"last_seen\":$(date +%s),\"host\":\"$(hostname)\",\"kind\":\"custom\"}]"
 ```
 
-Schedule it (cron `* * * * *`, a sidecar, or inside the MCP itself). The **MCP liveness — heartbeats** panel lists every MCP with `● UP` / `○ STALE`. No heartbeat sender ⇒ no liveness signal for that MCP (the status falls back to the official-app check).
+Schedule it (cron `* * * * *`, a sidecar, or inside the MCP itself). No heartbeat sender ⇒ that MCP shows `○ STALE` (the official server is the exception — it is auto-heartbeated).
 
 ---
 
@@ -142,6 +139,7 @@ Dashboard "Risk score" panels show the **sum** of all queries' scores in the tim
 - `MCP-Watch - Anti-Pattern Offenders` — per-user weighted risk breakdown (7d).
 - `MCP-Watch - REST Endpoint Distribution` — top REST endpoints per agent (24h).
 - `MCP-Watch - Top SPLs` — most frequent agent queries (24h).
+- `MCP-Watch - Heartbeat - Official MCP Server` — auto-heartbeats the official server every 60s (liveness); writes nothing if that app isn't installed.
 
 **Alerts:**
 - `MCP-Watch - Alert - Wildcard Index Used` — severity 4, fires on `index=*`.
@@ -176,7 +174,7 @@ The **User × Tool matrix** therefore reflects a **governance policy** you maint
 
 ## Notes & soft dependencies
 
-- The **status badge**, **Last MCP activity**, and the **MCP Access & Tools** dashboard assume the *official Splunk MCP Server* (provenance `MCP:Splunk_MCP_Server:*`, endpoint `/services/mcp`). With a different or absent MCP server these panels degrade gracefully (show offline / empty) — the app never errors.
+- Some signals are richest with the *official Splunk MCP Server* (provenance `MCP:Splunk_MCP_Server:*`, endpoint `/services/mcp`, the `mcp_tool_execute` capability). With a different or absent MCP server, MCP-Watch falls back to user-agent detection, REST-inferred tools, RBAC, and heartbeats — panels degrade gracefully (never error).
 - The **MCP Access & Tools** dashboard runs `| rest /services/authentication/users` and `/authorization/roles`, so a viewer needs a role with `list_users` / REST access (admin / power / sc_admin). The other three dashboards only need read access to `_audit` and `_internal`.
 - **Privacy:** processes audit metadata only. No data leaves your Splunk environment. No telemetry.
 
