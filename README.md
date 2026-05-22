@@ -4,7 +4,8 @@
 
 When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Protocol, it leaves a rich trail in `_audit` and `_internal` — but no native dashboard surfaces it. MCP-Watch turns those traces into an operations- and governance-ready view: which queries each agent runs, how often, how risky, against which indexes, and which MCP tools each user can reach.
 
-- **Version:** 1.0.0 · **License:** Apache 2.0
+- **Version:** 1.1.0 · **License:** Apache 2.0
+- **New in 1.1:** broader, multi-signal MCP detection — also catches **custom / community / non-official MCP servers** (no official provenance, shared account, generic user-agent) via REST-side user-agent matching. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup.
 - **Dependencies:** none — no CIM, no Add-on Builder, no companion apps. Reads built-in `_audit` / `_internal` in place.
 - **Compatibility:** Splunk Enterprise & Cloud 9.x / 10.x.
 - **No restart required** — ships only search-time knowledge objects (no index-time config, inputs, or binaries).
@@ -73,6 +74,17 @@ When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Pr
 | **Tool usage by user (24h)** | Stacked chart of which tools each agent actually used. |
 | **Searchable index scope per MCP role** | The real per-user data boundary — which indexes each MCP role may search. |
 
+### 5 · MCP Detection (REST) — *new in 1.1*
+Catches MCP/agent clients that v1.0's provenance-only logic missed (custom / community MCP servers, federation gateways).
+| Panel | What it shows |
+|-------|---------------|
+| **MCP / agent clients detected by user-agent** | `splunkd_access` clients whose user-agent matches `mcp_user_agents.csv` — request count, distinct endpoints, users. |
+| **REST activity by inferred tool** | Endpoint-based fallback tool attribution (e.g. `/search/jobs` → run_query) when provenance is absent. |
+| **Top REST endpoints from MCP / agent clients** | Which REST endpoints non-official clients hit. |
+| **Detection signal coverage** | Official-provenance clients vs. those detected by user-agent only. |
+
+> Detection is driven by `lookups/mcp_user_agents.csv` (wildcard user-agent patterns). Tune it for your environment — generic patterns like `python-httpx*` may match non-MCP automation.
+
 ---
 
 ## Risk scoring
@@ -128,6 +140,7 @@ The **User × Tool matrix** therefore reflects a **governance policy** you maint
 | `mcp_users.csv` | **Required.** The Splunk username(s) treated as MCP agents. |
 | `mcp_tool_denied.csv` | Optional governance deny policy (`user,tool`); drives the ✗ cells in the access matrix. |
 | `mcp_tool_catalog.csv` | Reference catalog of MCP tool names + categories. |
+| `mcp_user_agents.csv` | *(1.1)* Wildcard user-agent patterns used to detect non-official / custom MCP clients on the REST side. |
 | `regex_fixtures.csv` | Test fixtures for the anti-pattern self-test. |
 
 ---

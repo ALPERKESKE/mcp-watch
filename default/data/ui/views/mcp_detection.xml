@@ -1,0 +1,86 @@
+<dashboard version="1.1">
+  <label>MCP Detection (REST)</label>
+  <description>v1.1 — broader, multi-signal MCP detection. Catches custom / community / non-official MCP clients (no official provenance, shared account, generic user-agent) on the REST side via splunkd_access.</description>
+
+  <fieldset submitButton="false">
+    <input type="time" token="tr">
+      <label>Time range</label>
+      <default><earliest>-24h@h</earliest><latest>now</latest></default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <title>MCP / agent clients detected by user-agent</title>
+      <table>
+        <search>
+          <query>`mcp_rest_clients` | stats count as requests dc(uri_path) as distinct_endpoints values(user) as users by client_label, useragent | sort - requests</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Why this dashboard exists</title>
+      <html>
+        <div style="padding:14px;font-size:13px;line-height:1.6;">
+          <b>v1.0 limitation:</b> MCP-Watch only saw the <i>official</i> Splunk MCP Server — it keys on the
+          <code>provenance="MCP:Splunk_MCP_Server:&lt;tool&gt;"</code> marker and a dedicated service account.
+          <br/><br/>
+          <b>Real world:</b> custom / community MCP servers and federation gateways often carry
+          <b>no provenance</b>, authenticate as a <b>shared account</b> (e.g. <code>admin</code>), and show up
+          under a <b>generic user-agent</b> (<code>python-httpx</code>, <code>Go-http-client</code>, ...).
+          v1.0 misses them entirely.
+          <br/><br/>
+          <b>v1.1 fix:</b> detect MCP/agent traffic on the REST side by matching the <code>splunkd_access</code>
+          user-agent against <code>lookups/mcp_user_agents.csv</code> — independent of provenance or username.
+          Tune that lookup for your environment.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>REST activity by inferred tool (endpoint-based fallback)</title>
+      <chart>
+        <search>
+          <query>`mcp_rest_clients` | `mcp_rest_tool_infer` | chart limit=0 count over client_label by inferred_tool</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Top REST endpoints from MCP / agent clients</title>
+      <table>
+        <search>
+          <query>`mcp_rest_clients` | `mcp_rest_tool_infer` | stats count by uri_path, inferred_tool, client_label | sort - count | head 20</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Detection signal coverage — official provenance vs user-agent-only</title>
+      <chart>
+        <search>
+          <query>`mcp_rest_clients` | eval signal=if(client_label=="Official Splunk MCP Server","official provenance / server","detected by user-agent only") | stats dc(useragent) as clients count as requests by signal</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+  </row>
+</dashboard>

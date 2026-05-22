@@ -3,6 +3,7 @@
   <view name="activity_timeline" />
   <view name="quality_hygiene" />
   <view name="mcp_access" />
+  <view name="mcp_detection" />
   <collection label="Reports">
     <saved source="unmanaged" match="MCP-Watch -" />
   </collection>
