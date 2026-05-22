@@ -10,20 +10,22 @@
 
   <row>
     <panel>
-      <title>Risk score (7d)</title>
+      <title>Risky queries % (7d)</title>
       <html>
         <div style="text-align:left;margin:-8px 0 -14px 4px;position:relative;z-index:30;">
-          <span title="Risk score = per-query weighted anti-patterns + bonuses&#10;&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;no time bound   +2&#10;len(_raw)   +1&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Band per query: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1&#10;&#10;This number = sum of all queries' risk scores (no fixed max; lower is better, 0 = clean)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
+          <span title="Risky queries % = share of MCP queries that tripped at least one anti-pattern (risk_score &gt; 0), over all MCP queries in the range. 0% = all clean.&#10;&#10;Each query's per-query risk_score weights:&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;no time bound   +2&#10;len(_raw)   +1&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Per-query band: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1 (see the Risk band distribution panel for severity)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
         </div>
       </html>
       <single>
         <search base="base_7d">
-          <query>stats sum(risk_score) as score</query>
+          <query>eval _r=if(risk_score>0,1,0) | stats count as total sum(_r) as risky | eval pct=if(total>0,round(100*risky/total),0) | fields pct</query>
         </search>
         <option name="drilldown">none</option>
+        <option name="unit">%</option>
+        <option name="unitPosition">after</option>
         <option name="colorBy">value</option>
         <option name="rangeColors">["0x53a051","0xf8be34","0xd93f3c"]</option>
-        <option name="rangeValues">[1,20]</option>
+        <option name="rangeValues">[10,40]</option>
         <option name="useColors">1</option>
       </single>
     </panel>
