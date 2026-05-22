@@ -2,6 +2,4 @@ useragent_pattern,client_label
 Splunk_MCP_Server*,Official Splunk MCP Server
 *mcp-remote*,mcp-remote proxy (Claude / Cursor)
 *modelcontextprotocol*,MCP client (generic)
-python-httpx*,httpx client (custom/community MCP or automation)
-Go-http-client*,Go HTTP client (custom MCP or automation)
-splunk-sdk-python*,Splunk SDK for Python (script/automation)
+python-httpx*,httpx client (custom/community MCP)
