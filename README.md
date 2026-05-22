@@ -150,7 +150,9 @@ Community-supported. Questions, bugs, or feature requests:
 
 This is a **personal, independently developed** project, created and maintained by the author in a personal capacity. It is **not affiliated with, sponsored by, endorsed by, or connected to the author's employer or any other organization**, and does not represent the views, work product, or interests of any such party.
 
-The software is provided **"as is"**, without warranty of any kind (see the Apache 2.0 license). Splunk, Splunkbase, and related marks are trademarks of their respective owners; this project is an independent third-party work and is **not affiliated with or endorsed by Splunk LLC / Cisco**. "Splunk" is used only in a referential manner to indicate compatibility.
+The software is provided **"as is"**, without warranty of any kind (see the Apache 2.0 license). It was **built with AI assistance (Anthropic's Claude)** and may contain errors — bug reports and fixes are welcome via the project's [issues](https://github.com/ALPERKESKE/mcp-watch/issues).
+
+Splunk, Splunkbase, and related marks are trademarks of their respective owners; this project is an independent third-party work and is **not affiliated with or endorsed by Splunk LLC / Cisco**. "Splunk" is used only in a referential manner to indicate compatibility.
 
 ## License & author
 
