@@ -5,7 +5,11 @@
 When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Protocol, it leaves a rich trail in `_audit` and `_internal` — but no native dashboard surfaces it. MCP-Watch turns those traces into an operations- and governance-ready view: which queries each agent runs, how often, how risky, against which indexes, and which MCP tools each user can reach.
 
 - **Version:** 1.1.0 · **License:** Apache 2.0
-- **New in 1.1:** broader, multi-signal MCP detection — also catches **custom / community / non-official MCP servers** (no official provenance, shared account, generic user-agent) via REST-side user-agent matching. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup.
+- **What's new since 1.0:**
+  - **Multi-signal detection** — also catches **custom / community / non-official MCP servers** (no official provenance, shared account, generic user-agent) via REST-side user-agent matching + endpoint-based tool inference. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup.
+  - **Unified Access &amp; Tools** — the access model works with the official `mcp_tool_execute` capability AND, where that's absent, falls back to the connecting account's **RBAC + REST-detected tool usage** (so custom MCPs aren't blank).
+  - **Liveness heartbeats** — the status badge reflects a **true up/down signal** (official app enabled OR a fresh heartbeat in the `mcp_heartbeat` KV collection), decoupled from query activity.
+  - **Getting Started** dashboard — in-app setup guide + "is data flowing?" checks.
 - **Dependencies:** none — no CIM, no Add-on Builder, no companion apps. Reads built-in `_audit` / `_internal` in place.
 - **Compatibility:** Splunk Enterprise & Cloud 9.x / 10.x.
 - **No restart required** — ships only search-time knowledge objects (no index-time config, inputs, or binaries).
@@ -32,15 +36,19 @@ When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Pr
 
 ## Dashboards & panels
 
+### 0 · Getting Started — first-run setup
+In-app onboarding: how to populate `mcp_users.csv`, the current configuration, and live "is data flowing?" checks. Open this first after install.
+
 ### 1 · MCP Overview — at-a-glance picture (last 24h)
 | Panel | What it shows |
 |-------|---------------|
-| **Splunk MCP Server — Status** | Green **✓ ONLINE** / red **✗ OFFLINE** badge — whether the official Splunk MCP Server app is installed & enabled. |
-| **Last MCP activity** | Minutes since the last call to `/services/mcp` (green < 15m, amber, red). |
+| **MCP Server — Status** | Green **✓ ONLINE** / red **✗ OFFLINE** badge — true liveness: official MCP Server app enabled **OR** a fresh heartbeat (see *Liveness & heartbeats*). Re-checked every ~60s, decoupled from query volume. |
+| **Last MCP activity** | Minutes since the last MCP/agent REST call (green < 15m, amber, red). |
 | **Queries (last 24h)** | Total SPL queries run by MCP users. |
 | **Active MCP users** | Distinct MCP agents seen. |
 | **Risk score (24h)** | Sum of every query's risk score (see *Risk scoring*). |
 | **Unique SPL bodies** | Distinct queries (deduplication signal). |
+| **MCP liveness — heartbeats** | Per-MCP `● UP` / `○ STALE` from the `mcp_heartbeat` KV collection. |
 | **Query volume — 15-min buckets** | Timechart of query rate. |
 | **Top 5 SPL bodies (24h)** | The most frequently run agent queries. |
 
@@ -65,14 +73,14 @@ When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Pr
 | **Off-hours risk events (7d)** | Risky queries run before 07:00 / after 19:00. |
 | **Top offending queries** | The actual SPL bodies driving the score, with band + user. |
 
-### 4 · MCP Access & Tools — who can do what
+### 4 · MCP Access & Tools — who can do what *(unified: official + custom)*
+Works whether or not the official MCP Server is present. With the official server, it uses the `mcp_tool_execute` capability + tool catalog; otherwise it derives access from the connecting account's RBAC + REST-detected tool usage.
 | Panel | What it shows |
 |-------|---------------|
-| **Users who can call MCP tools** | Accounts whose role grants `mcp_tool_execute`, with their roles. |
-| **Access model** | Short note explaining how tool access works here (see below). |
-| **User × Tool access matrix** | Matrix of every MCP user × every tool — **✓ granted** (green) / **✗ denied** (red). Denials come from the `mcp_tool_denied.csv` policy lookup. |
-| **Tool usage by user (24h)** | Stacked chart of which tools each agent actually used. |
-| **Searchable index scope per MCP role** | The real per-user data boundary — which indexes each MCP role may search. |
+| **MCP accounts** | Accounts treated as MCP clients — via the `mcp_tool_execute` capability **or** user-agent detection — with their roles. |
+| **User × Tool matrix** | Per account × tool — **✓ granted / ✗ denied** (official, from `mcp_tool_denied.csv`) and **✓ used** (custom, inferred from REST). |
+| **Tool usage by account** | Stacked chart of inferred tool usage per account. |
+| **Searchable index scope per MCP account** | The real data boundary — which indexes each MCP account's roles may search. |
 
 ### 5 · MCP Detection (REST) — *new in 1.1*
 Catches MCP/agent clients that v1.0's provenance-only logic missed (custom / community MCP servers, federation gateways).
@@ -84,6 +92,26 @@ Catches MCP/agent clients that v1.0's provenance-only logic missed (custom / com
 | **Detection signal coverage** | Official-provenance clients vs. those detected by user-agent only. |
 
 > Detection is driven by `lookups/mcp_user_agents.csv` (wildcard user-agent patterns). Tune it for your environment — generic patterns like `python-httpx*` may match non-MCP automation.
+
+---
+
+## Liveness &amp; heartbeats
+
+The **MCP Server — Status** badge on *MCP Overview* shows a true up/down signal, **independent of query activity**:
+
+- **Official Splunk MCP Server** → ONLINE when the app is installed and enabled (checked every ~60s).
+- **Custom / external MCP** → ONLINE when a **fresh heartbeat** (≤ 120s old) exists in the `mcp_heartbeat` KV collection.
+
+Because an external MCP runs outside Splunk, the only reliable liveness signal is a heartbeat the MCP (or a sidecar next to it) sends. Have it upsert one row per MCP every ~60s — for example:
+
+```bash
+curl -sk -u <user>:<pass> \
+  "https://<splunk-host>:8089/servicesNS/nobody/mcp_watch/storage/collections/data/mcp_heartbeat/batch_save" \
+  -H "Content-Type: application/json" \
+  -d "[{\"_key\":\"my-mcp\",\"mcp_id\":\"my-mcp\",\"last_seen\":$(date +%s),\"host\":\"$(hostname)\",\"kind\":\"custom\"}]"
+```
+
+Schedule it (cron `* * * * *`, a sidecar, or inside the MCP itself). The **MCP liveness — heartbeats** panel lists every MCP with `● UP` / `○ STALE`. No heartbeat sender ⇒ no liveness signal for that MCP (the status falls back to the official-app check).
 
 ---
 
@@ -140,7 +168,8 @@ The **User × Tool matrix** therefore reflects a **governance policy** you maint
 | `mcp_users.csv` | **Required.** The Splunk username(s) treated as MCP agents. |
 | `mcp_tool_denied.csv` | Optional governance deny policy (`user,tool`); drives the ✗ cells in the access matrix. |
 | `mcp_tool_catalog.csv` | Reference catalog of MCP tool names + categories. |
-| `mcp_user_agents.csv` | *(1.1)* Wildcard user-agent patterns used to detect non-official / custom MCP clients on the REST side. |
+| `mcp_user_agents.csv` | Wildcard user-agent patterns used to detect non-official / custom MCP clients on the REST side. |
+| `mcp_heartbeat` *(KV)* | Liveness heartbeats — one row per MCP (`mcp_id`, `last_seen`, `host`, `kind`); upserted by the MCP/sidecar. |
 | `regex_fixtures.csv` | Test fixtures for the anti-pattern self-test. |
 
 ---
