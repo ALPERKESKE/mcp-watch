@@ -1,0 +1,134 @@
+<dashboard version="1.1">
+  <label>Quality &amp; Hygiene</label>
+  <description>Does the MCP user write good SPL? Anti-pattern surfacing, breakdown, and offending queries.</description>
+
+  <search id="base_7d">
+    <query>`mcp_audit_searches` earliest=-7d latest=now | `mcp_spl_extract` | `mcp_antipattern_check` | `mcp_risk_score`</query>
+    <earliest>-7d</earliest>
+    <latest>now</latest>
+  </search>
+
+  <row>
+    <panel>
+      <title>Risk score (7d)</title>
+      <html>
+        <div style="text-align:left;margin:-8px 0 -14px 4px;position:relative;z-index:30;">
+          <span title="Risk score = per-query weighted anti-patterns + bonuses&#10;&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;no time bound   +2&#10;len(_raw)   +1&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Band per query: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1&#10;&#10;This number = sum of all queries' risk scores (no fixed max; lower is better, 0 = clean)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
+        </div>
+      </html>
+      <single>
+        <search base="base_7d">
+          <query>stats sum(risk_score) as score</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xd93f3c"]</option>
+        <option name="rangeValues">[1,20]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Queries with at least one hit</title>
+      <single>
+        <search base="base_7d">
+          <query>where risk_score > 0 | stats count</query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Worst offender (user)</title>
+      <single>
+        <search base="base_7d">
+          <query>stats sum(risk_score) as score by user | sort - score | head 1 | fields user</query>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Highest risk band (7d)</title>
+      <single>
+        <search base="base_7d">
+          <query>where risk_band != "NONE" | eval rank = case(risk_band="CRITICAL",4, risk_band="HIGH",3, risk_band="MEDIUM",2, risk_band="LOW",1, true(),0) | stats max(rank) as r | eval band = case(r=4,"CRITICAL", r=3,"HIGH", r=2,"MEDIUM", r=1,"LOW", true(),"NONE") | fields band</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="colorBy">value</option>
+        <option name="useColors">1</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xf58f39","0xd93f3c"]</option>
+        <option name="rangeValues">[1,2,3]</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Anti-pattern breakdown</title>
+      <chart>
+        <search base="base_7d">
+          <query>stats
+              sum(is_wildcard_index)   as wildcard_index,
+              sum(is_len_raw)          as len_raw,
+              sum(is_dbinspect_all)    as dbinspect_all,
+              sum(is_no_time_bound)    as no_time_bound,
+              sum(is_overly_wide_time) as wide_time_window
+            | transpose
+            | rename column as anti_pattern, "row 1" as hits
+            | eval anti_pattern = case(anti_pattern=="wildcard_index", "index=*", anti_pattern=="len_raw", "len(_raw)", anti_pattern=="dbinspect_all", "dbinspect index=*", anti_pattern=="no_time_bound", "no time bound", anti_pattern=="wide_time_window", "&gt;30d window", true(), anti_pattern)
+            | sort - hits</query>
+        </search>
+        <option name="charting.chart">bar</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Hits by user</title>
+      <chart>
+        <search base="base_7d">
+          <query>where risk_score > 0 | stats sum(risk_score) as score by user | sort - score</query>
+        </search>
+        <option name="charting.chart">column</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Risk band distribution (7d)</title>
+      <chart>
+        <search base="base_7d">
+          <query>where risk_score > 0
+            | eval band_rank = case(risk_band="CRITICAL",1, risk_band="HIGH",2, risk_band="MEDIUM",3, risk_band="LOW",4)
+            | stats count by risk_band band_rank
+            | sort band_rank
+            | fields risk_band count</query>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Off-hours risk events (7d)</title>
+      <chart>
+        <search base="base_7d">
+          <query>where risk_score > 0 | eval bucket = if(is_off_hours = 1, "off-hours", "business-hours") | stats count by bucket</query>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Top offending queries</title>
+      <table>
+        <search base="base_7d">
+          <query>where risk_score > 0
+            | stats count, max(risk_score) as max_score, values(risk_band) as risk_bands by spl_body
+            | sort - max_score - count
+            | head 20</query>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "2.0.0",
+  "info": {
+    "title": "MCP-Watch",
+    "id": {
+      "group": null,
+      "name": "mcp_watch",
+      "version": "1.0.0"
+    },
+    "author": [
+      {
+        "name": "alper keske",
+        "email": null,
+        "company": null
+      }
+    ],
+    "releaseDate": null,
+    "description": "Zero-dependency visibility and governance for AI agents (MCP servers) operating against Splunk. Surfaces every SPL an MCP user runs, flags anti-patterns, and reports on REST/endpoint usage using only built-in _audit and _internal data.",
+    "classification": {
+      "intendedAudience": null,
+      "categories": [],
+      "developmentStatus": null
+    },
+    "commonInformationModels": null,
+    "license": {
+      "name": "Apache 2.0",
+      "text": "LICENSE",
+      "uri": null
+    },
+    "privacyPolicy": {
+      "name": null,
+      "text": null,
+      "uri": null
+    },
+    "releaseNotes": {
+      "name": null,
+      "text": "README.md",
+      "uri": null
+    }
+  },
+  "dependencies": null,
+  "tasks": null,
+  "inputGroups": null,
+  "incompatibleApps": null,
+  "platformRequirements": null
+}

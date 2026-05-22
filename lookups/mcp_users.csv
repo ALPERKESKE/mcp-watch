@@ -1,0 +1,2 @@
+user,role,description
+mcp_service_account,mcp_agent,Replace with the Splunk username your MCP server authenticates as

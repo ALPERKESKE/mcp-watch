@@ -1,0 +1,44 @@
+#
+# MCP-Watch — default.meta
+#
+# Default permissions for objects shipped with the app.
+# Lookups are writable by the admin role (Setup wizard updates mcp_users.csv).
+#
+
+[]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[macros]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[eventtypes]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[tags]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[savedsearches]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[transforms]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[views]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+[nav]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system
+
+# Lookups admin-writable so Setup UI / users with the admin role can edit
+# mcp_users.csv post-install without touching the filesystem.
+[lookups/mcp_users.csv]
+access = read : [ * ], write : [ admin, sc_admin ]
+export = system

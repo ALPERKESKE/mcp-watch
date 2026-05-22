@@ -1,0 +1,81 @@
+<dashboard version="1.1">
+  <label>MCP Access &amp; Tools</label>
+  <description>Who can call MCP tools, which tools are enabled, and which user actually uses what.</description>
+
+  <row>
+    <panel>
+      <title>Users who can call MCP tools (mcp_tool_execute)</title>
+      <table>
+        <search>
+          <query>| rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | eval roles=mvjoin(roles,", ") | table title realname roles</query>
+          <refresh>5m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Access model</title>
+      <html>
+        <div style="padding:14px;font-size:13px;line-height:1.6;">
+          <b>How MCP tool access works here:</b>
+          <ul>
+            <li><b>Tool enablement is global</b> — every tool in the catalog is enabled for all MCP users (Splunk_MCP_Server <code>mcp_tools_enabled</code> KV store).</li>
+            <li><b>Per-user access</b> is gated by the <code>mcp_tool_execute</code> capability (granted via role).</li>
+            <li>Each tool runs with the user's own Splunk RBAC, so the real per-user boundary is the <b>searchable index scope</b> (table below).</li>
+          </ul>
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>User × Tool access matrix  (✓ = granted · ✗ = denied)</title>
+      <table>
+        <search>
+          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | stats values(title) as user ] | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | chart limit=0 values(cell) over user by tool</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+          <refresh>2m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <format type="color">
+          <colorPalette type="map">{"✗":#dc4e41,"✓":#53a051}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+
+
+  <row>
+    <panel>
+      <title>Tool usage by user (24h)</title>
+      <chart>
+        <search>
+          <query>search `mcp_audit_searches` | rex field=_raw "provenance=\"MCP:Splunk_MCP_Server:(?&lt;tool&gt;[^\"]+)\"" | eval tool=coalesce(tool,"(unknown)") | chart count over user by tool</query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+          <refresh>2m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Searchable index scope per MCP role</title>
+      <table>
+        <search>
+          <query>| rest /services/authorization/roles | search capabilities=mcp_tool_execute | eval searchable_indexes=mvjoin(srchIndexesAllowed,", ") | table title searchable_indexes | sort title</query>
+          <refresh>5m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

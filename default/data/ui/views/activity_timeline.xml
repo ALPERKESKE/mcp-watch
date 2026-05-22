@@ -1,0 +1,82 @@
+<dashboard version="1.1">
+  <label>Activity Timeline</label>
+  <description>Drill into individual MCP queries and the REST endpoints driving them.</description>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="tr">
+      <label>Time range</label>
+      <default>
+        <earliest>-24h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="user_filter" searchWhenChanged="true">
+      <label>MCP user</label>
+      <default>*</default>
+      <choice value="*">All</choice>
+      <fieldForLabel>user</fieldForLabel>
+      <fieldForValue>user</fieldForValue>
+      <search>
+        <query>| inputlookup mcp_users.csv | fields user</query>
+      </search>
+    </input>
+  </fieldset>
+
+  <search id="base_queries">
+    <query>`mcp_audit_searches` user="$user_filter$" | `mcp_spl_extract`</query>
+    <earliest>$tr.earliest$</earliest>
+    <latest>$tr.latest$</latest>
+  </search>
+
+  <row>
+    <panel>
+      <title>Queries per hour</title>
+      <chart>
+        <search base="base_queries">
+          <query>timechart span=1h count by user useother=f</query>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Latest 50 queries</title>
+      <table>
+        <search base="base_queries">
+          <query>sort - _time | head 50 | table _time, user, spl_body</query>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>REST endpoint distribution (24h)</title>
+      <chart>
+        <search>
+          <query>`mcp_rest_calls` earliest=-24h | `mcp_rest_path` | stats count by uri_path | sort - count | head 15</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>REST status code mix</title>
+      <chart>
+        <search>
+          <query>`mcp_rest_calls` earliest=-24h | stats count by status | sort - count</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+      </chart>
+    </panel>
+  </row>
+
+</dashboard>

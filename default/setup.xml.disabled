@@ -1,0 +1,16 @@
+<setup>
+  <block title="MCP-Watch — Configure MCP Service Accounts">
+    <text>
+      Enter the Splunk usernames that your MCP server(s) authenticate as.
+      One username per line. Activity from these users in the audit log
+      will be treated as MCP / AI-agent traffic.
+
+      Default: alper_mcp. Change to match the service account configured
+      on your MCP server (see Splunk_MCP_Server token user).
+    </text>
+    <input field="mcp_user_list" type="textarea">
+      <label>MCP User Accounts (one per line)</label>
+      <default>alper_mcp</default>
+    </input>
+  </block>
+</setup>

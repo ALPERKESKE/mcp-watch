@@ -1,0 +1,36 @@
+test_id,anti_pattern,expected,search,notes
+wildcard_idx_001,wildcard_index,1,index=*,
+wildcard_idx_002,wildcard_index,1,index =*,whitespace before =
+wildcard_idx_003,wildcard_index,1,index  =  *,extra whitespace
+wildcard_idx_004,wildcard_index,1,INDEX=*,uppercase — (?i)
+wildcard_idx_005,wildcard_index,0,index=_audit,
+wildcard_idx_006,wildcard_index,0,| stats count by index,no index= clause
+wildcard_idx_007,wildcard_index,1,"where index=""*""",where with quoted star — currently flags
+wildcard_idx_008,wildcard_index,0,sourcetype=index_log foo,no index= clause
+len_raw_001,len_raw,1,eval r = len(_raw),
+len_raw_002,len_raw,1,| eval r=LEN(_raw),uppercase
+len_raw_003,len_raw,0,| stats count,
+len_raw_004,len_raw,0,eval x = lenraw,no parens
+dbinspect_001,dbinspect_all,1,| dbinspect index=*,
+dbinspect_002,dbinspect_all,1,| dbinspect  index = *,whitespace
+dbinspect_003,dbinspect_all,0,| dbinspect index=_audit,
+dbinspect_004,dbinspect_all,0,index=foo | stats count,
+no_time_001,no_time_bound,1,index=_audit,no earliest/latest
+no_time_002,no_time_bound,1,| stats count,
+no_time_003,no_time_bound,0,index=_audit earliest=-1h,
+no_time_004,no_time_bound,0,index=_audit latest=now,
+no_time_005,no_time_bound,0,index=_audit earliest = -1h,whitespace
+no_time_006,no_time_bound,1,index=_audit | bin _time span=1h | stats count by _time,v1.0 bug fix — `_time` in eval/bin no longer suppresses flag
+no_time_007,no_time_bound,1,index=_audit | eval x=_time,v1.0 bug fix
+no_time_008,no_time_bound,1,index=foo | sort _time,v1.0 bug fix
+no_time_009,no_time_bound,0,index=foo EARLIEST=-7d,uppercase — (?i)
+wide_time_001,overly_wide_time,1,earliest=-30d,
+wide_time_002,overly_wide_time,1,earliest=-90d,
+wide_time_003,overly_wide_time,1,earliest=-12w,
+wide_time_004,overly_wide_time,1,earliest=-3mon,
+wide_time_005,overly_wide_time,1,earliest=-1y,
+wide_time_006,overly_wide_time,0,earliest=-1h,
+wide_time_007,overly_wide_time,0,earliest=-7d,
+wide_time_008,overly_wide_time,0,earliest=-1d,
+wide_time_009,overly_wide_time,0,earliest=-5w,KNOWN_GAP: 5w is >30d but regex requires 2+ digits before w. v1.1 TODO.
+wide_time_010,overly_wide_time,0,earliest=-9d,KNOWN_GAP: single-digit days >7 not caught. v1.1 TODO.

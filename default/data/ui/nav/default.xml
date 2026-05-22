@@ -1,0 +1,12 @@
+<nav search_view="search" color="#65A637">
+  <view name="mcp_overview" default="true" />
+  <view name="activity_timeline" />
+  <view name="quality_hygiene" />
+  <view name="mcp_access" />
+  <collection label="Reports">
+    <saved source="unmanaged" match="MCP-Watch -" />
+  </collection>
+  <collection label="Search">
+    <view name="search" />
+  </collection>
+</nav>

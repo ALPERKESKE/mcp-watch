@@ -1,0 +1,15 @@
+tool,category
+splunk_get_info,info
+splunk_get_indexes,discovery
+splunk_get_index_info,discovery
+splunk_get_user_list,admin
+splunk_get_user_info,admin
+splunk_run_query,search
+splunk_get_metadata,discovery
+splunk_get_kv_store_collections,discovery
+splunk_get_knowledge_objects,discovery
+saia_generate_spl,ai_assistant
+saia_explain_spl,ai_assistant
+saia_ask_splunk_question,ai_assistant
+saia_optimize_spl,ai_assistant
+splunk_run_saved_search,search
