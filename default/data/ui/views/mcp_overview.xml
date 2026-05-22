@@ -14,7 +14,7 @@
 
   <row>
     <panel>
-      <title>MCP liveness — heartbeats (UP = heartbeat within 120s)</title>
+      <title>MCP liveness — heartbeats (UP = heartbeat within 6 min)</title>
       <table>
         <search>
           <query>| `mcp_heartbeats` | eval status=if(fresh=1,"● UP","○ STALE"), last_heartbeat=strftime(last_seen,"%Y-%m-%d %H:%M:%S") | table mcp_id status kind host age_seconds last_heartbeat | sort mcp_id</query>

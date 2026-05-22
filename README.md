@@ -13,7 +13,7 @@ When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Pr
 - **Dependencies:** none — no CIM, no Add-on Builder, no companion apps. Reads built-in `_audit` / `_internal` in place.
 - **Compatibility:** Splunk Enterprise & Cloud 9.x / 10.x.
 - **No restart required** — ships only search-time knowledge objects (no index-time config, inputs, or binaries).
-- **AppInspect:** passes `--mode precert` and `--included-tags cloud` (0 failures / 0 warnings).
+- **AppInspect:** passes `--mode precert` and `--included-tags cloud` with **0 failures** (one informational notice that the app uses a KV-store collection — no action required).
 
 ---
 
@@ -96,9 +96,9 @@ Catches MCP/agent clients that v1.0's provenance-only logic missed (custom / com
 
 ## Liveness &amp; heartbeats
 
-The **MCP liveness — heartbeats** panel (first row of *MCP Overview*) shows per-MCP up/down, **independent of query activity** — `● UP` when a fresh heartbeat (≤ 120s old) exists in the `mcp_heartbeat` KV collection, otherwise `○ STALE`.
+The **MCP liveness — heartbeats** panel (first row of *MCP Overview*) shows per-MCP up/down, **independent of query activity** — `● UP` when a fresh heartbeat (≤ 6 min old) exists in the `mcp_heartbeat` KV collection, otherwise `○ STALE`.
 
-- **Official Splunk MCP Server** → auto-heartbeated for you: the scheduled search *MCP-Watch - Heartbeat - Official MCP Server* writes a heartbeat every 60s while the app is enabled. No setup needed.
+- **Official Splunk MCP Server** → auto-heartbeated for you: the scheduled search *MCP-Watch - Heartbeat - Official MCP Server* writes a heartbeat every 5 min while the app is enabled. No setup needed.
 - **Custom / external MCP** → must send its own heartbeat (it runs outside Splunk, so that is the only reliable liveness signal). Have the MCP, or a sidecar next to it, upsert one row every ~60s — for example:
 
 ```bash
@@ -139,7 +139,7 @@ Dashboard "Risk score" panels show the **sum** of all queries' scores in the tim
 - `MCP-Watch - Anti-Pattern Offenders` — per-user weighted risk breakdown (7d).
 - `MCP-Watch - REST Endpoint Distribution` — top REST endpoints per agent (24h).
 - `MCP-Watch - Top SPLs` — most frequent agent queries (24h).
-- `MCP-Watch - Heartbeat - Official MCP Server` — auto-heartbeats the official server every 60s (liveness); writes nothing if that app isn't installed.
+- `MCP-Watch - Heartbeat - Official MCP Server` — auto-heartbeats the official server every 5 min (liveness); writes nothing if that app isn't installed.
 
 **Alerts:**
 - `MCP-Watch - Alert - Wildcard Index Used` — severity 4, fires on `index=*`.
