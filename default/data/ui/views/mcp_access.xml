@@ -35,7 +35,7 @@
       <title>User × Tool access matrix  (✓ = granted · ✗ = denied)</title>
       <table>
         <search>
-          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | stats values(title) as user ] | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | chart limit=0 values(cell) over user by tool</query>
+          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | stats values(title) as user ] | where isnotnull(user) | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | chart limit=0 values(cell) over user by tool</query>
           <earliest>-24h</earliest>
           <latest>now</latest>
           <refresh>2m</refresh>
