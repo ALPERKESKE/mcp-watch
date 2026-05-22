@@ -33,10 +33,10 @@
     <panel>
       <title>MCP Server — Status (any MCP: official app or detected client)</title>
       <html depends="$mcp_online$">
-        <div style="background-color:#53a051;color:#ffffff;padding:30px;border-radius:8px;text-align:center;font-size:30px;font-weight:bold;">&#10003;&#160; ONLINE</div>
+        <div style="background-color:#53a051;color:#ffffff;padding:10px;border-radius:6px;text-align:center;font-size:18px;font-weight:bold;">&#10003;&#160; ONLINE</div>
       </html>
       <html depends="$mcp_offline$">
-        <div style="background-color:#dc4e41;color:#ffffff;padding:30px;border-radius:8px;text-align:center;font-size:30px;font-weight:bold;">&#10007;&#160; OFFLINE</div>
+        <div style="background-color:#dc4e41;color:#ffffff;padding:10px;border-radius:6px;text-align:center;font-size:18px;font-weight:bold;">&#10007;&#160; OFFLINE</div>
       </html>
     </panel>
     <panel>
@@ -57,9 +57,6 @@
         <option name="useColors">1</option>
       </single>
     </panel>
-  </row>
-
-  <row>
     <panel>
       <title>Queries (last 24h)</title>
       <single>
@@ -81,6 +78,9 @@
         <option name="drilldown">none</option>
       </single>
     </panel>
+  </row>
+
+  <row>
     <panel>
       <title>Risk score (24h)</title>
       <single>
