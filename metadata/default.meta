@@ -42,3 +42,8 @@ export = system
 [lookups/mcp_users.csv]
 access = read : [ * ], write : [ admin, sc_admin ]
 export = system
+
+# v1.2 — liveness heartbeat KV collection (MCPs/sidecars upsert here).
+[collections/mcp_heartbeat]
+access = read : [ * ], write : [ admin, power, sc_admin ]
+export = system

@@ -14,7 +14,7 @@
 
   <!-- Driver search: sets mcp_online / mcp_offline tokens for the status badge -->
   <search>
-    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval o=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(o) as app_online | appendcols [ search `internal_index` sourcetype=splunkd_access earliest=-5m latest=now | lookup mcp_user_agents useragent_pattern AS useragent OUTPUT client_label | where isnotnull(client_label) OR like(uri_path,"%/services/mcp%") | stats count as rest_hits ] | eval online=if(coalesce(app_online,0)=1 OR coalesce(rest_hits,0)>0,1,0) | fields online</query>
+    <query>| rest splunk_server=local /services/apps/local/Splunk_MCP_Server | eval o=if('disabled'=0 OR isnull('disabled'),1,0) | stats max(o) as app_online | appendcols [ | inputlookup mcp_heartbeat | eval age=now()-last_seen | where age<=120 | stats count as fresh_hb ] | eval online=if(coalesce(app_online,0)=1 OR coalesce(fresh_hb,0)>0,1,0) | fields online</query>
     <refresh>60s</refresh>
     <refreshType>delay</refreshType>
     <done>
@@ -102,6 +102,23 @@
         </search>
         <option name="drilldown">none</option>
       </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>MCP liveness — heartbeats (UP = heartbeat within 120s)</title>
+      <table>
+        <search>
+          <query>| `mcp_heartbeats` | eval status=if(fresh=1,"● UP","○ STALE"), last_heartbeat=strftime(last_seen,"%Y-%m-%d %H:%M:%S") | table mcp_id status kind host age_seconds last_heartbeat | sort mcp_id</query>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"● UP":#53a051,"○ STALE":#dc4e41}</colorPalette>
+        </format>
+      </table>
     </panel>
   </row>
 
