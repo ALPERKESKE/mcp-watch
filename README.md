@@ -140,6 +140,12 @@ The **User × Tool matrix** therefore reflects a **governance policy** you maint
 
 ---
 
+## Support
+
+Community-supported. Questions, bugs, or feature requests:
+- **Email:** alperkeske@gmail.com
+- **Issues:** open an issue on the project repository.
+
 ## License & author
 
-Apache License 2.0 — see `LICENSE`. · alper keske · 2026
+Apache License 2.0 — see `LICENSE`. · alper keske · 2026 · alperkeske@gmail.com
