@@ -46,7 +46,7 @@ In-app onboarding: how to populate `mcp_users.csv`, the current configuration, a
 | **Last MCP activity** | Minutes since the last MCP/agent REST call (green < 15m, amber, red). |
 | **Queries (last 24h)** | Total SPL queries run by MCP users. |
 | **Active MCP users** | Distinct MCP agents seen. |
-| **Risk score (24h)** | Sum of every query's risk score (see *Risk scoring*). |
+| **Risky queries % · MEDIUM+ (24h)** | Share of MCP queries that reach the MEDIUM risk band or higher (see *Risk scoring*). Bounded 0–100%. |
 | **Unique SPL bodies** | Distinct queries (deduplication signal). |
 | **Query volume — 15-min buckets** | Timechart of query rate. |
 | **Top 5 SPL bodies (24h)** | The most frequently run agent queries. |
@@ -62,7 +62,7 @@ In-app onboarding: how to populate `mcp_users.csv`, the current configuration, a
 ### 3 · Quality & Hygiene — does the agent write good SPL? (7d)
 | Panel | What it shows |
 |-------|---------------|
-| **Risk score (7d)** | Total weighted risk. The **ⓘ** by the title explains the formula on hover. |
+| **Risky queries % · MEDIUM+ (7d)** | Share of MCP queries at MEDIUM band or higher. The **ⓘ** by the title explains the formula on hover. |
 | **Queries with at least one hit** | Count of queries that tripped any anti-pattern. |
 | **Worst offender (user)** | The agent with the highest cumulative risk. |
 | **Highest risk band (7d)** | Worst single-query band reached (LOW…CRITICAL). |
@@ -128,7 +128,7 @@ Each query gets a **risk score** = weighted sum of detected anti-patterns, plus 
 
 **Risk band (per query):** `CRITICAL ≥ 15` · `HIGH ≥ 8` · `MEDIUM ≥ 3` · `LOW ≥ 1` · `NONE = 0`.
 
-Dashboard "Risk score" panels show the **sum** of all queries' scores in the time range — there is no fixed maximum; lower is better (0 = clean).
+The headline KPI is **Risky queries %** — the share of queries at the **MEDIUM band or higher** (`risk_score ≥ 3`), bounded 0–100%, lower is better. (MEDIUM+ rather than "any hit" because MCP servers pass the time range as an API parameter, so the *no time bound* signal (+2 = LOW) fires on almost every MCP query; MEDIUM+ isolates real anti-patterns.)
 
 ---
 
