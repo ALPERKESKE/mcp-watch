@@ -70,10 +70,10 @@
       </single>
     </panel>
     <panel>
-      <title>Risky queries % (24h)</title>
+      <title>Risky queries % · MEDIUM+ (24h)</title>
       <single>
         <search base="base_24h">
-          <query>eval _r=if(risk_score>0,1,0) | stats count as total sum(_r) as risky | eval pct=if(total>0,round(100*risky/total),0) | fields pct</query>
+          <query>eval _r=if(risk_score>=3,1,0) | stats count as total sum(_r) as risky | eval pct=if(total>0,round(100*risky/total),0) | fields pct</query>
         </search>
         <option name="drilldown">none</option>
         <option name="unit">%</option>
