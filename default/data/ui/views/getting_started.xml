@@ -46,11 +46,18 @@
           <ul>
             <li><b>Splunk UI:</b> Settings → Lookups → <a href="/manager/mcp_watch/data/lookup-table-files">Lookup table files</a> → edit <code>mcp_users.csv</code> (needs the Lookup Editor, or edit on disk).</li>
             <li><b>SPL (no extra app):</b> run once in Search —
-              <br/><code>| inputlookup mcp_users.csv | append [| makeresults | eval user="YOUR_MCP_USER", role="mcp_agent", description="my MCP server" | fields user role description] | outputlookup mcp_users.csv</code></li>
+              <br/><code>| inputlookup mcp_users.csv | append [| makeresults | eval user="YOUR_MCP_USER", role="mcp_agent", description="my MCP server" | table user role description] | table user role description | outputlookup mcp_users.csv</code></li>
           </ul>
           <b>Step 3 — Custom / non-official MCP server?</b> If your MCP doesn't use the official Splunk MCP Server,
           add its client <b>user-agent</b> pattern to <code>mcp_user_agents.csv</code> so the
           <b>MCP Detection (REST)</b> dashboard catches it.
+          <br/><br/>
+          <b>Default exclusions.</b> Splunk's reserved identities (<code>admin</code>, <code>splunk-system-user</code>,
+          <code>sidecar_agent-manager</code>, <code>nobody</code>) are filtered out of every discovery panel via
+          <code>mcp_excluded_users.csv</code> — they are never real MCP agents (any user with the
+          <code>admin</code> role inherits every capability, and the official server's own housekeeping calls
+          run as <code>splunk-system-user</code> with the same user-agent as real traffic). If your deployment
+          really does use <code>admin</code> as the MCP service account, edit the lookup and remove that row.
           <br/><br/>
           <b>Step 4 — Distributed / Search Head Cluster?</b> Deploy this app via your <b>Deployer</b>
           (<code>$SPLUNK_HOME/etc/shcluster/apps/</code> → <code>splunk apply shcluster-bundle</code>), not directly on each search head.
