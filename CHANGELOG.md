@@ -6,6 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **`splunk-system-user` no longer appears as a phantom MCP agent.** The
+  official Splunk MCP Server app issues its own credential-unlock and
+  housekeeping REST calls as `splunk-system-user`, carrying the same
+  `Splunk_MCP_Server/*` user-agent that real MCP traffic uses. The user-agent
+  lookup matched these, so the "Detected agents" / "Active accounts" /
+  User × Tool matrix panels double-counted: on a representative 24h trace
+  homepc saw 110 phantom calls from `splunk-system-user` next to 99 real
+  calls from the MCP service account. `mcp_rest_clients` now excludes
+  `splunk-system-user` and `nobody` at the base macro.
+- **`mcp_rest_clients` composition documented.** The base-searches comment
+  block promised callers could append `earliest=...` to any base macro, but
+  `mcp_rest_clients` ends in `| lookup … | where` (transforming), so an
+  appended `earliest=` lands past the `where` and Splunk rejects it
+  ("Error in 'where' command: The operator at 'earliest=-1h' is invalid"). The
+  macro's docstring now states that this one requires time bounds as
+  dispatch parameters, not appended.
+
+### Changed
+- **Tool inference (`mcp_rest_tool_infer`) covers more endpoints.** Live MCP
+  traffic on a working homepc install showed that ~85% of REST calls were
+  falling into `other`. The macro now classifies them into actionable buckets:
+  - SAIA tools (`saia_generate_spl`, `saia_explain_spl`, `saia_optimize_spl`,
+    `saia_ask_question`, plus a `saia_other` catch-all for SAIA settings reads)
+  - `validate_spl` (`/services/search/parser`, fired on every run_query)
+  - `search_summary` (`/admin/summarization`, the result-metadata preflight)
+  - `auth_check` (`/services/authentication/current-context`, the per-call
+    auth probe — high volume, useful liveness signal but should not inflate
+    "tool usage" panels)
+  After the change only generic `/services/apps/local` listings still land in
+  `other` on a representative trace. No alert or risk-score logic changed; this
+  only refines the labels in the MCP Access and Detection dashboards.
+
 ## [1.1.0] — 2026-05-27
 
 First update since the Splunkbase release of 1.0.0. Bundles two internal
