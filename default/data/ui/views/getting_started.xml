@@ -17,10 +17,10 @@
 
   <row>
     <panel>
-      <title>Step 1 — Who is your MCP agent? (top non-internal users by audit-search count, 24h — empty on a fresh install means nothing but admin/system traffic yet; skip to Step 2)</title>
+      <title>Step 1 — Who is your MCP agent? (top non-internal users, 24h)</title>
       <table>
         <search>
-          <query>`audit_index` action=search info=granted NOT [ | inputlookup mcp_excluded_users | fields user ] | stats count as searches, latest(_time) as last by user | sort - searches | head 10 | convert ctime(last) | rename last as last_search</query>
+          <query>`audit_index` action=search info=granted NOT [ | inputlookup mcp_excluded_users | fields user ] | stats count as searches, latest(_time) as last by user | sort - searches | head 10 | convert ctime(last) | rename last as last_search | appendpipe [stats count | where count=0 | eval user="(no real / MCP user has run a query yet)", searches="—", last_search="head to Step 2 →"] | fields - count</query>
           <earliest>-24h</earliest>
           <latest>now</latest>
         </search>
