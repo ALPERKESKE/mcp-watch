@@ -179,6 +179,29 @@ heartbeats* phase) into a single Splunkbase minor release.
   bullet) to drop the admin example, mention the exclusion lookup, and
   tell operators how to opt back in if their deployment really does use
   `admin` as the MCP service account.
+- **Heartbeat scheduled search no longer logs HTTP 404 every 5 minutes
+  when the official Splunk MCP Server isn't installed.** The original
+  SPL hit `/services/apps/local/Splunk_MCP_Server` directly; on installs
+  without the official server, splunkd logged two ERROR + one WARN line
+  per dispatch (12×/hr, forever). Now lists all apps via
+  `/services/apps/local` and filters with `where title="..."` — silent
+  when not present.
+- **Getting Started Step 1 title explains the empty state.** On a
+  fresh Splunk where admin and `splunk-system-user` are the only
+  accounts that have run searches (both filtered by
+  `mcp_excluded_users`), Step 1 returns zero rows. The expanded title
+  now tells a first-time operator that empty here means "no real /
+  MCP traffic yet — proceed to Step 2".
+- **Step 2's bulk-edit SPL drops the default placeholder row.** Previous
+  version appended `YOUR_MCP_USER` next to the
+  `mcp_service_account` placeholder, leaving both in
+  `mcp_users.csv`. Adds `| where user!="mcp_service_account"` at the
+  head of the example so the lookup ends up with only the real user.
+- **App.conf `is_configured = true`.** MCP-Watch ships with
+  `setup.xml.disabled` because configuration is via the Getting
+  Started dashboard, not a Splunk setup wizard. With
+  `is_configured = false` Splunk's Apps page showed a misleading
+  "Unconfigured" badge that had no wizard to launch.
 - Heartbeat dashboard cell now XML-escapes `<` in the freshness query
   (was breaking dashboard parse).
 - Heartbeat scheduled search cron is `*/5 * * * *` paired with a 6-min
