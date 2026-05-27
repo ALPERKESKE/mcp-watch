@@ -13,7 +13,7 @@
       <title>Risky queries % · MEDIUM+ (7d)</title>
       <html>
         <div style="text-align:left;margin:-8px 0 -14px 4px;position:relative;z-index:30;">
-          <span title="Risky queries % = share of MCP queries that reach the MEDIUM band or higher (risk_score &#8805; 3), over all MCP queries in the range. 0% = clean.&#10;&#10;Why MEDIUM+ and not any hit? MCP servers pass the time range as an API parameter, not in the SPL text, so 'no time bound' (+2 = LOW) fires on almost every MCP query. MEDIUM+ isolates real anti-patterns.&#10;&#10;Per-query risk_score weights:&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;no time bound   +2&#10;len(_raw)   +1&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Bands: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1 (severity in the Risk band distribution panel)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
+          <span title="Risky queries % = share of MCP queries that reach the MEDIUM band or higher (risk_score &#8805; 3), over all MCP queries in the range. 0% = clean.&#10;&#10;Per-query risk_score weights:&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;len(_raw)   +1&#10;no time bound   +0  (detected but not scored: MCP passes time range as API param, not in SPL text)&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Bands: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1 (severity in the Risk band distribution panel)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
         </div>
       </html>
       <single>

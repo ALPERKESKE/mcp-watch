@@ -121,14 +121,15 @@ Each query gets a **risk score** = weighted sum of detected anti-patterns, plus 
 | wildcard index (`index=*`) | +5 |
 | `dbinspect index=*` | +4 |
 | overly-wide time window (≥ 30d) | +3 |
-| no time bound (no `earliest`/`latest`) | +2 |
 | `len(_raw)` | +1 |
 | *bonus:* off-hours (before 07:00 / after 19:00) **and** risky | +2 |
 | *bonus:* huge result set (> 100k rows) **and** risky | +5 |
 
 **Risk band (per query):** `CRITICAL ≥ 15` · `HIGH ≥ 8` · `MEDIUM ≥ 3` · `LOW ≥ 1` · `NONE = 0`.
 
-The headline KPI is **Risky queries %** — the share of queries at the **MEDIUM band or higher** (`risk_score ≥ 3`), bounded 0–100%, lower is better. (MEDIUM+ rather than "any hit" because MCP servers pass the time range as an API parameter, so the *no time bound* signal (+2 = LOW) fires on almost every MCP query; MEDIUM+ isolates real anti-patterns.)
+The headline KPI is **Risky queries %** — the share of queries at the **MEDIUM band or higher** (`risk_score ≥ 3`), bounded 0–100%, lower is better.
+
+> **Note on `is_no_time_bound`:** the flag is still detected (and reported in dashboards for transparency), but its weight is **0** — MCP servers pass the search time range as an API parameter (out-of-band from the SPL text), so the signal would otherwise fire on virtually every MCP query and saturate the score with noise. Override the weight in `local/macros.conf` if you need it counted in a human-SPL context.
 
 ---
 

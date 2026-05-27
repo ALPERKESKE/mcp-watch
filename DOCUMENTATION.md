@@ -41,7 +41,7 @@ Every captured query is scored against five expensive / sloppy SPL patterns (mac
 | `is_wildcard_index` | contains `index=*` (case-insensitive) | **5** | Scans every index — one of the costliest mistakes; almost always unintended. |
 | `is_dbinspect_all` | contains `dbinspect index=*` | **4** | Enumerates all buckets across all indexes. |
 | `is_overly_wide_time` | has `earliest=` spanning roughly **≥ 30 days** (≥ `-30d`, `-N0w`, `-Nmon`, `-Ny`) | **3** | Huge time windows hammer indexers; usually accidental. |
-| `is_no_time_bound` | has no `earliest=` / `latest=` clause in the SPL | **2** | Unbounded search. Pragmatic match — picker-only ad-hoc human searches may false-positive; MCP servers typically inject `earliest=` directly, so the signal is reliable for agent traffic. |
+| `is_no_time_bound` | has no `earliest=` / `latest=` clause in the SPL | **0** | **Detected and reported, but not scored.** MCP servers pass the search time range as an API parameter (out-of-band from the SPL text), so this would fire on virtually every MCP query and saturate the risk score. Override the weight in `local/macros.conf` if you need it counted for human-SPL traffic. |
 | `is_len_raw` | contains `len(_raw)` | **1** | Forces full `_raw` materialization; a common (mostly human) performance footgun. |
 
 > **v1.1 fix:** `is_no_time_bound` previously matched the literal string `_time` anywhere in the SPL, so a query like `index=_audit | bin _time` falsely cleared the flag. The macro now requires an actual `earliest=` / `latest=` clause. Known regex gaps remain for `is_overly_wide_time` (single-digit weeks ≥ 5w aren't matched; v1.1 TODO) — see `lookups/regex_fixtures.csv` for the documented coverage.
@@ -54,10 +54,12 @@ Pipe `mcp_risk_score` after `mcp_antipattern_check` to upgrade from a flat flag-
 
 ```
 risk_score = (is_wildcard_index*5 + is_dbinspect_all*4 + is_overly_wide_time*3
-              + is_no_time_bound*2 + is_len_raw*1)
+              + is_no_time_bound*0 + is_len_raw*1)
            + (is_off_hours ? 2 : 0)              # only if risk_weight > 0
            + (result_count > 100k ? 5 : 0)       # only if risk_weight > 0
 ```
+
+> `is_no_time_bound` is intentionally weighted 0 — it would fire on nearly every MCP query (MCP dispatches `earliest`/`latest` as API parameters, not in the SPL the macro inspects). The flag is still detected and shown on dashboards, so users can audit the underlying behaviour without it inflating the risk score.
 
 Bonuses fire **only when at least one anti-pattern is already present** — a benign query running off-hours doesn't get a phantom risk bump.
 
@@ -67,7 +69,7 @@ The macro also emits a categorical `risk_band` for dashboards / alerts:
 |---|---|---|
 | `CRITICAL` | `risk_score ≥ 15` | `index=*` + `>30d window` + off-hours, or similar combo |
 | `HIGH` | `≥ 8` | `index=*` alone, or two mid-tier patterns together |
-| `MEDIUM` | `≥ 3` | One mid-tier pattern (e.g. `no_time_bound` + off-hours) |
+| `MEDIUM` | `≥ 3` | One mid-tier pattern (e.g. `is_overly_wide_time`, or `is_len_raw` + off-hours bonus) |
 | `LOW` | `≥ 1` | A single low-weight flag (`len_raw` only, etc.) |
 | `NONE` | `0` | Clean query |
 

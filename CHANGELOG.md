@@ -69,10 +69,19 @@ heartbeats* phase) into a single Splunkbase minor release.
   meaningless ceiling). The new metric is the **share of MCP queries at
   the MEDIUM band or higher (`risk_score ≥ 3`)**, bounded 0–100, lower
   is better. Shows up on both **MCP Overview** and **Quality & Hygiene**.
-- MEDIUM+ was chosen because MCP servers pass the time range as an API
-  parameter, so the *no time bound* signal (+2 = LOW) fires on almost
-  every MCP query; `risk_score > 0` would saturate to ~100% and lose
-  all signal. MEDIUM+ isolates real anti-patterns.
+
+#### `is_no_time_bound` weight set to 0 (was 2)
+- MCP servers pass the search time range as an API parameter (the
+  dispatched `earliest`/`latest` arrive at the search head out-of-band),
+  not inside the SPL text the macro inspects. The flag therefore fires on
+  virtually every MCP query — leaving it at the v1.0 weight of +2 would
+  push almost every MCP query into the LOW band, drown out real
+  anti-patterns, and force a downstream "ignore LOW" workaround in every
+  consumer.
+- The flag is still **detected and reported** in dashboards (transparency
+  — users can audit the behaviour) but does not contribute to
+  `risk_score`. Override the weight in `local/macros.conf` if you need
+  it counted for human-SPL traffic.
 
 #### MCP Overview top row recomposed
 - The standalone Online/Offline status badge is gone; **MCP liveness**
