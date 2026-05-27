@@ -14,7 +14,7 @@
       <title>MCP accounts — capability-granted or detected by user-agent</title>
       <table>
         <search>
-          <query>| rest /services/authentication/users | eval user=title, roles=mvjoin('roles',", "), cap=if(match(mvjoin('capabilities'," "),"mcp_tool_execute"),"mcp_tool_execute",null()) | fields user roles cap | join type=left user [ search `mcp_rest_clients` | stats count as rest_calls values(client_label) as detected_as by user ] | where isnotnull(cap) OR isnotnull(detected_as) | eval detected_via=mvjoin(mvappend(if(isnotnull(cap),"capability",null()),if(isnotnull(detected_as),"user-agent",null())),", ") | table user roles detected_as detected_via rest_calls | sort - rest_calls</query>
+          <query>| rest /services/authentication/users | eval user=title, roles=mvjoin('roles',", "), cap=if(match(mvjoin('capabilities'," "),"mcp_tool_execute"),"mcp_tool_execute",null()) | fields user roles cap | search NOT [ | inputlookup mcp_excluded_users | fields user ] | join type=left user [ search `mcp_rest_clients` | stats count as rest_calls values(client_label) as detected_as by user ] | where isnotnull(cap) OR isnotnull(detected_as) | eval detected_via=mvjoin(mvappend(if(isnotnull(cap),"capability",null()),if(isnotnull(detected_as),"user-agent",null())),", ") | table user roles detected_as detected_via rest_calls | sort - rest_calls</query>
           <earliest>$tr.earliest$</earliest>
           <latest>$tr.latest$</latest>
           <refresh>2m</refresh>
@@ -44,7 +44,7 @@
       <title>User × Tool matrix  (official: ✓ granted / ✗ denied · custom: ✓ used)</title>
       <table>
         <search>
-          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | stats values(title) as user ] | where isnotnull(user) | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | append [ search `mcp_rest_clients` | `mcp_rest_tool_infer` | stats count by user inferred_tool | rename inferred_tool as tool | eval cell="✓" ] | chart limit=0 values(cell) over user by tool</query>
+          <query>| inputlookup mcp_tool_catalog | stats values(tool) as tool | appendcols [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | search NOT [ | inputlookup mcp_excluded_users | rename user as title | fields title ] | stats values(title) as user ] | where isnotnull(user) | mvexpand user | mvexpand tool | join type=left user tool [ | inputlookup mcp_tool_denied | eval denied="yes" ] | eval cell=if(denied=="yes","✗","✓") | append [ search `mcp_rest_clients` | `mcp_rest_tool_infer` | stats count by user inferred_tool | rename inferred_tool as tool | eval cell="✓" ] | search NOT [ | inputlookup mcp_excluded_users | fields user ] | chart limit=0 values(cell) over user by tool</query>
           <earliest>$tr.earliest$</earliest>
           <latest>$tr.latest$</latest>
           <refresh>2m</refresh>
@@ -78,7 +78,7 @@
       <title>Searchable index scope per MCP account</title>
       <table>
         <search>
-          <query>| rest /services/authentication/users | eval user=title | fields user roles | mvexpand roles | search [ search `mcp_rest_clients` | stats count by user | fields user | append [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | rename title as user | fields user ] | dedup user ] | join type=left roles [ | rest /services/authorization/roles | eval roles=title, idx=mvjoin('srchIndexesAllowed',", ") | fields roles idx ] | stats values(roles) as roles values(idx) as searchable_indexes by user</query>
+          <query>| rest /services/authentication/users | eval user=title | fields user roles | mvexpand roles | search [ search `mcp_rest_clients` | stats count by user | fields user | append [ | rest /services/authentication/users | search [ | rest /services/authorization/roles | search capabilities=mcp_tool_execute | rename title as roles | fields roles ] | rename title as user | fields user ] | dedup user ] | search NOT [ | inputlookup mcp_excluded_users | fields user ] | join type=left roles [ | rest /services/authorization/roles | eval roles=title, idx=mvjoin('srchIndexesAllowed',", ") | fields roles idx ] | stats values(roles) as roles values(idx) as searchable_indexes by user</query>
           <earliest>$tr.earliest$</earliest>
           <latest>$tr.latest$</latest>
           <refresh>5m</refresh>

@@ -8,17 +8,31 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`mcp_excluded_users.csv` lookup** centralises the list of accounts that
+  discovery panels and the REST detection macro should never treat as MCP
+  agents. Ships with `admin`, `splunk-system-user`, `sidecar_agent-manager`,
+  and `nobody` with a `reason` column. When a future Splunk release
+  introduces another internal identity, add a row to the lookup — no code
+  change needed. Consumed by `mcp_rest_clients`, the MCP Access & Tools
+  dashboard (all three discovery panels), and Getting Started Step 1.
+
 ### Fixed
+- **`admin` no longer appears in MCP Access panels as a capability-granted
+  MCP.** Any user with the `admin` role inherits every capability defined
+  anywhere — including the `mcp_tool_execute` capability declared by the
+  `mcp_agent` role — so the "MCP accounts — capability-granted or detected
+  by user-agent" panel and the "User × Tool matrix" surfaced `admin` as a
+  full-tool MCP. That is almost never a real MCP service account; it is the
+  blanket admin grant leaking through. All three discovery panels in
+  `mcp_access.xml` now filter against `mcp_excluded_users`.
 - **`splunk-system-user` no longer appears as a phantom MCP agent.** The
   official Splunk MCP Server app issues its own credential-unlock and
   housekeeping REST calls as `splunk-system-user`, carrying the same
-  `Splunk_MCP_Server/*` user-agent that real MCP traffic uses. The user-agent
-  lookup matched these, so the "Detected agents" / "Active accounts" /
-  User × Tool matrix panels double-counted: on a representative 24h trace
-  homepc saw 110 phantom calls from `splunk-system-user` next to 99 real
-  calls from the MCP service account. `mcp_rest_clients` now excludes
-  `splunk-system-user`, `sidecar_agent-manager`, and `nobody` at the base
-  macro.
+  `Splunk_MCP_Server/*` user-agent that real MCP traffic uses. On a 24h
+  trace homepc saw 110 phantom calls next to 99 real ones. `mcp_rest_clients`
+  now filters against `mcp_excluded_users` instead of inline `user!=...`
+  checks, so the same exclusion list covers REST detection and dashboards.
 - **Getting Started Step 1 no longer lists Splunk's internal identities.**
   The "Who is your MCP agent?" discovery panel showed top audit search users
   with no filter, so on a real install `splunk-system-user` (~1180 searches
@@ -26,7 +40,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   `sidecar_agent-manager` (Splunk 10.4 AgentManager) sat above the real MCP
   account. A first-time operator could plausibly add one of those to
   `mcp_users.csv` and end up labelling every Splunk scheduled search as MCP
-  traffic. The panel now excludes the three known reserved identities.
+  traffic. The panel now filters against `mcp_excluded_users`.
 - **`mcp_rest_clients` composition documented.** The base-searches comment
   block promised callers could append `earliest=...` to any base macro, but
   `mcp_rest_clients` ends in `| lookup … | where` (transforming), so an

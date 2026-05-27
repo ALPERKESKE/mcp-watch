@@ -1,0 +1,5 @@
+user,reason
+admin,"Splunk's default administrative account — inherits every capability including mcp_tool_execute via blanket admin role grant. Almost never a real MCP service account."
+splunk-system-user,"Splunk's internal identity for scheduled searches and inter-process work. Used by MCP-Watch's own cron reports. Never a real MCP."
+sidecar_agent-manager,"Splunk 10.4 AgentManager Sidecar identity (user-agent AgentManagerSidecar). Internal, not an MCP."
+nobody,"Splunk's namespace marker — appears in /servicesNS/nobody/... paths and as the user on app-level configs. Not a real account."
