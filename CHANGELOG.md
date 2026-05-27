@@ -186,12 +186,16 @@ heartbeats* phase) into a single Splunkbase minor release.
   per dispatch (12×/hr, forever). Now lists all apps via
   `/services/apps/local` and filters with `where title="..."` — silent
   when not present.
-- **Getting Started Step 1 title explains the empty state.** On a
+- **Getting Started Step 1 shows a helper row when empty.** On a
   fresh Splunk where admin and `splunk-system-user` are the only
   accounts that have run searches (both filtered by
-  `mcp_excluded_users`), Step 1 returns zero rows. The expanded title
-  now tells a first-time operator that empty here means "no real /
-  MCP traffic yet — proceed to Step 2".
+  `mcp_excluded_users`), Step 1 used to render a blank table that
+  gave a first-time operator no guidance. An `appendpipe` now
+  synthesises a single row when results are empty —
+  `(no real / MCP user has run a query yet)` · `—` ·
+  `head to Step 2 →` — so the panel always communicates next steps.
+  The title was kept short ("top non-internal users, 24h") since the
+  synthesized row carries the explanation now.
 - **Step 2's bulk-edit SPL drops the default placeholder row.** Previous
   version appended `YOUR_MCP_USER` next to the
   `mcp_service_account` placeholder, leaving both in
