@@ -17,7 +17,16 @@ adheres to [Semantic Versioning](https://semver.org/).
   User × Tool matrix panels double-counted: on a representative 24h trace
   homepc saw 110 phantom calls from `splunk-system-user` next to 99 real
   calls from the MCP service account. `mcp_rest_clients` now excludes
-  `splunk-system-user` and `nobody` at the base macro.
+  `splunk-system-user`, `sidecar_agent-manager`, and `nobody` at the base
+  macro.
+- **Getting Started Step 1 no longer lists Splunk's internal identities.**
+  The "Who is your MCP agent?" discovery panel showed top audit search users
+  with no filter, so on a real install `splunk-system-user` (~1180 searches
+  from scheduled jobs, including MCP-Watch's own cron reports) and
+  `sidecar_agent-manager` (Splunk 10.4 AgentManager) sat above the real MCP
+  account. A first-time operator could plausibly add one of those to
+  `mcp_users.csv` and end up labelling every Splunk scheduled search as MCP
+  traffic. The panel now excludes the three known reserved identities.
 - **`mcp_rest_clients` composition documented.** The base-searches comment
   block promised callers could append `earliest=...` to any base macro, but
   `mcp_rest_clients` ends in `| lookup … | where` (transforming), so an

@@ -20,7 +20,7 @@
       <title>Step 1 — Who is your MCP agent? (run this to find the user)</title>
       <table>
         <search>
-          <query>`audit_index` action=search info=granted | stats count as searches, latest(_time) as last by user | sort - searches | head 10 | convert ctime(last) | rename last as last_search</query>
+          <query>`audit_index` action=search info=granted user!="splunk-system-user" user!="sidecar_agent-manager" user!="nobody" | stats count as searches, latest(_time) as last by user | sort - searches | head 10 | convert ctime(last) | rename last as last_search</query>
           <earliest>-24h</earliest>
           <latest>now</latest>
         </search>
