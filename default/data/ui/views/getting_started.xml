@@ -17,7 +17,7 @@
 
   <row>
     <panel>
-      <title>Step 1 — Who is your MCP agent? (run this to find the user)</title>
+      <title>Step 1 — Who is your MCP agent? (top non-internal users by audit-search count, 24h — empty on a fresh install means nothing but admin/system traffic yet; skip to Step 2)</title>
       <table>
         <search>
           <query>`audit_index` action=search info=granted NOT [ | inputlookup mcp_excluded_users | fields user ] | stats count as searches, latest(_time) as last by user | sort - searches | head 10 | convert ctime(last) | rename last as last_search</query>
@@ -46,7 +46,8 @@
           <ul>
             <li><b>Splunk UI:</b> Settings → Lookups → <a href="/manager/mcp_watch/data/lookup-table-files">Lookup table files</a> → edit <code>mcp_users.csv</code> (needs the Lookup Editor, or edit on disk).</li>
             <li><b>SPL (no extra app):</b> run once in Search —
-              <br/><code>| inputlookup mcp_users.csv | append [| makeresults | eval user="YOUR_MCP_USER", role="mcp_agent", description="my MCP server" | table user role description] | table user role description | outputlookup mcp_users.csv</code></li>
+              <br/><code>| inputlookup mcp_users.csv | where user!="mcp_service_account" | append [| makeresults | eval user="YOUR_MCP_USER", role="mcp_agent", description="my MCP server" | table user role description] | table user role description | outputlookup mcp_users.csv</code>
+              <br/>(<code>where user!="mcp_service_account"</code> drops the default placeholder row at the same time.)</li>
           </ul>
           <b>Step 3 — Custom / non-official MCP server?</b> If your MCP doesn't use the official Splunk MCP Server,
           add its client <b>user-agent</b> pattern to <code>mcp_user_agents.csv</code> so the
