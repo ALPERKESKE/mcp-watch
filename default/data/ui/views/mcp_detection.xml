@@ -1,6 +1,6 @@
 <dashboard version="1.1">
   <label>MCP Detection (REST)</label>
-  <description>v1.1 — broader, multi-signal MCP detection. Catches custom / community / non-official MCP clients (no official provenance, shared account, generic user-agent) on the REST side via splunkd_access.</description>
+  <description>v1.1 — broader, multi-signal MCP detection. Catches custom / community / non-official MCP clients (no official provenance, generic user-agent) on the REST side via splunkd_access. Splunk's reserved identities (admin, splunk-system-user, ...) are excluded by default via mcp_excluded_users.csv.</description>
 
   <fieldset submitButton="false">
     <input type="time" token="tr">
@@ -30,13 +30,21 @@
           <code>provenance="MCP:Splunk_MCP_Server:&lt;tool&gt;"</code> marker and a dedicated service account.
           <br/><br/>
           <b>Real world:</b> custom / community MCP servers and federation gateways often carry
-          <b>no provenance</b>, authenticate as a <b>shared account</b> (e.g. <code>admin</code>), and show up
-          under a <b>generic user-agent</b> (<code>python-httpx</code>, <code>Go-http-client</code>, ...).
-          v1.0 misses them entirely.
+          <b>no provenance</b> and show up under a <b>generic user-agent</b>
+          (<code>python-httpx</code>, <code>Go-http-client</code>, ...). v1.0 misses them entirely.
           <br/><br/>
           <b>v1.1 fix:</b> detect MCP/agent traffic on the REST side by matching the <code>splunkd_access</code>
-          user-agent against <code>lookups/mcp_user_agents.csv</code> — independent of provenance or username.
+          user-agent against <code>lookups/mcp_user_agents.csv</code> — independent of provenance.
           Tune that lookup for your environment.
+          <br/><br/>
+          <b>Excluded by default:</b> Splunk's reserved identities (<code>admin</code>,
+          <code>splunk-system-user</code>, <code>sidecar_agent-manager</code>, <code>nobody</code>) are filtered
+          via <code>lookups/mcp_excluded_users.csv</code>. Without the filter, any user with the
+          <code>admin</code> role inherits <code>mcp_tool_execute</code> and the official MCP Server's
+          own housekeeping calls (which run as <code>splunk-system-user</code> with the same
+          <code>Splunk_MCP_Server/*</code> user-agent as real traffic) would surface as phantom agents.
+          If your deployment legitimately uses <code>admin</code> as the MCP service account, remove
+          its row from the lookup.
         </div>
       </html>
     </panel>

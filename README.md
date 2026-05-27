@@ -6,7 +6,7 @@ When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Pr
 
 - **Version:** 1.1.0 · **License:** Apache 2.0
 - **What's new since 1.0:**
-  - **Multi-signal detection** — also catches **custom / community / non-official MCP servers** (no official provenance, shared account, generic user-agent) via REST-side user-agent matching + endpoint-based tool inference. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup.
+  - **Multi-signal detection** — also catches **custom / community / non-official MCP servers** (no official provenance, generic user-agent) via REST-side user-agent matching + endpoint-based tool inference. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup. Splunk's reserved identities (`admin`, `splunk-system-user`, …) are excluded by default via `mcp_excluded_users.csv`.
   - **Unified Access &amp; Tools** — the access model works with the official `mcp_tool_execute` capability AND, where that's absent, falls back to the connecting account's **RBAC + REST-detected tool usage** (so custom MCPs aren't blank).
   - **Liveness heartbeats** — a dedicated **MCP liveness** panel shows per-MCP up/down, decoupled from query activity. The official server is auto-heartbeated; custom MCPs send their own heartbeat into the `mcp_heartbeat` KV collection.
   - **Getting Started** dashboard — in-app setup guide + "is data flowing?" checks.
