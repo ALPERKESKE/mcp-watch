@@ -197,11 +197,6 @@ heartbeats* phase) into a single Splunkbase minor release.
   `mcp_service_account` placeholder, leaving both in
   `mcp_users.csv`. Adds `| where user!="mcp_service_account"` at the
   head of the example so the lookup ends up with only the real user.
-- **App.conf `is_configured = true`.** MCP-Watch ships with
-  `setup.xml.disabled` because configuration is via the Getting
-  Started dashboard, not a Splunk setup wizard. With
-  `is_configured = false` Splunk's Apps page showed a misleading
-  "Unconfigured" badge that had no wizard to launch.
 - Heartbeat dashboard cell now XML-escapes `<` in the freshness query
   (was breaking dashboard parse).
 - Heartbeat scheduled search cron is `*/5 * * * *` paired with a 6-min
