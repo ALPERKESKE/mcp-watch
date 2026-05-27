@@ -1,6 +1,6 @@
 # MCP-Watch for Splunk — App Documentation
 
-> **App ID:** `mcp_watch` · **Version:** 1.2.0 · **License:** Apache 2.0
+> **App ID:** `mcp_watch` · **Version:** 1.1.0 · **License:** Apache 2.0
 > **Compatibility:** Splunk Enterprise 9.x / 10.x and Splunk Cloud · **Dependencies:** none
 
 ---
