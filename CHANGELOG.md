@@ -6,64 +6,6 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased]
-
-### Added
-- **`mcp_excluded_users.csv` lookup** centralises the list of accounts that
-  discovery panels and the REST detection macro should never treat as MCP
-  agents. Ships with `admin`, `splunk-system-user`, `sidecar_agent-manager`,
-  and `nobody` with a `reason` column. When a future Splunk release
-  introduces another internal identity, add a row to the lookup — no code
-  change needed. Consumed by `mcp_rest_clients`, the MCP Access & Tools
-  dashboard (all three discovery panels), and Getting Started Step 1.
-
-### Fixed
-- **`admin` no longer appears in MCP Access panels as a capability-granted
-  MCP.** Any user with the `admin` role inherits every capability defined
-  anywhere — including the `mcp_tool_execute` capability declared by the
-  `mcp_agent` role — so the "MCP accounts — capability-granted or detected
-  by user-agent" panel and the "User × Tool matrix" surfaced `admin` as a
-  full-tool MCP. That is almost never a real MCP service account; it is the
-  blanket admin grant leaking through. All three discovery panels in
-  `mcp_access.xml` now filter against `mcp_excluded_users`.
-- **`splunk-system-user` no longer appears as a phantom MCP agent.** The
-  official Splunk MCP Server app issues its own credential-unlock and
-  housekeeping REST calls as `splunk-system-user`, carrying the same
-  `Splunk_MCP_Server/*` user-agent that real MCP traffic uses. On a 24h
-  trace homepc saw 110 phantom calls next to 99 real ones. `mcp_rest_clients`
-  now filters against `mcp_excluded_users` instead of inline `user!=...`
-  checks, so the same exclusion list covers REST detection and dashboards.
-- **Getting Started Step 1 no longer lists Splunk's internal identities.**
-  The "Who is your MCP agent?" discovery panel showed top audit search users
-  with no filter, so on a real install `splunk-system-user` (~1180 searches
-  from scheduled jobs, including MCP-Watch's own cron reports) and
-  `sidecar_agent-manager` (Splunk 10.4 AgentManager) sat above the real MCP
-  account. A first-time operator could plausibly add one of those to
-  `mcp_users.csv` and end up labelling every Splunk scheduled search as MCP
-  traffic. The panel now filters against `mcp_excluded_users`.
-- **`mcp_rest_clients` composition documented.** The base-searches comment
-  block promised callers could append `earliest=...` to any base macro, but
-  `mcp_rest_clients` ends in `| lookup … | where` (transforming), so an
-  appended `earliest=` lands past the `where` and Splunk rejects it
-  ("Error in 'where' command: The operator at 'earliest=-1h' is invalid"). The
-  macro's docstring now states that this one requires time bounds as
-  dispatch parameters, not appended.
-
-### Changed
-- **Tool inference (`mcp_rest_tool_infer`) covers more endpoints.** Live MCP
-  traffic on a working homepc install showed that ~85% of REST calls were
-  falling into `other`. The macro now classifies them into actionable buckets:
-  - SAIA tools (`saia_generate_spl`, `saia_explain_spl`, `saia_optimize_spl`,
-    `saia_ask_question`, plus a `saia_other` catch-all for SAIA settings reads)
-  - `validate_spl` (`/services/search/parser`, fired on every run_query)
-  - `search_summary` (`/admin/summarization`, the result-metadata preflight)
-  - `auth_check` (`/services/authentication/current-context`, the per-call
-    auth probe — high volume, useful liveness signal but should not inflate
-    "tool usage" panels)
-  After the change only generic `/services/apps/local` listings still land in
-  `other` on a representative trace. No alert or risk-score logic changed; this
-  only refines the labels in the MCP Access and Detection dashboards.
-
 ## [1.1.0] — 2026-05-27
 
 First update since the Splunkbase release of 1.0.0. Bundles two internal
@@ -144,6 +86,22 @@ heartbeats* phase) into a single Splunkbase minor release.
   affiliation) and AI-assisted development disclosure.
 - `check_for_updates = true` in `app.conf` (Splunkbase requires it).
 
+#### Reserved-user exclusion (`mcp_excluded_users.csv`)
+- New lookup centralises the accounts that discovery panels and the REST
+  detection macro should never treat as MCP agents. Ships with `admin`,
+  `splunk-system-user`, `sidecar_agent-manager`, and `nobody`, each with a
+  human-readable `reason` column. When a future Splunk release introduces
+  another internal identity, add a row to the lookup — no code change
+  needed.
+- Consumed by `mcp_rest_clients` (REST detection), all three discovery
+  panels in **MCP Access & Tools**, and Getting Started Step 1.
+- Discovered while running live MCP traffic against the official server:
+  every user with the `admin` role inherits `mcp_tool_execute` (it surfaced
+  as a "full-tool MCP" in the access matrix), and the official server's
+  own credential-unlock / housekeeping calls run as `splunk-system-user`
+  carrying the same `Splunk_MCP_Server/*` user-agent as real traffic — on
+  a 24h trace that was 110 phantom calls next to 99 real ones.
+
 ### Changed
 
 #### "Risky queries %" KPI replaces unbounded "Risk score" sum
@@ -171,7 +129,56 @@ heartbeats* phase) into a single Splunkbase minor release.
   (Last activity · Queries 24h · Active users · Risky queries % ·
   Unique SPL bodies).
 
+#### REST tool inference (`mcp_rest_tool_infer`) covers more endpoints
+- Live MCP traffic on a working homepc install showed ~85% of REST calls
+  falling into `other`. The macro now classifies them into actionable
+  buckets:
+  - SAIA tools (`saia_generate_spl`, `saia_explain_spl`,
+    `saia_optimize_spl`, `saia_ask_question`, plus a `saia_other`
+    catch-all for SAIA settings reads)
+  - `validate_spl` (`/services/search/parser`, fired on every run_query)
+  - `search_summary` (`/admin/summarization`, the result-metadata
+    preflight)
+  - `auth_check` (`/services/authentication/current-context`, the per-call
+    auth probe — high volume, useful liveness signal but should not
+    inflate "tool usage" panels)
+- After the change only generic `/services/apps/local` listings still
+  land in `other` on a representative trace. No alert or risk-score
+  logic changed; this only refines the labels in the MCP Access and
+  Detection dashboards.
+
 ### Fixed
+- **`admin` no longer appears in MCP Access panels as a capability-granted
+  MCP.** Filtered via `mcp_excluded_users` in all three discovery panels
+  in `mcp_access.xml`. See the *Reserved-user exclusion* subsection above
+  for context.
+- **`splunk-system-user` no longer appears as a phantom MCP agent.**
+  `mcp_rest_clients` filters against `mcp_excluded_users` instead of
+  inline `user!=…` checks, so the same exclusion list covers REST
+  detection and dashboards.
+- **Getting Started Step 1 no longer lists Splunk's internal identities.**
+  The "Who is your MCP agent?" discovery panel had no filter, so
+  `splunk-system-user` (~1180 audit searches from scheduled jobs,
+  including MCP-Watch's own cron reports) and `sidecar_agent-manager`
+  sat above the real MCP account. A first-time operator could plausibly
+  add one of those to `mcp_users.csv` and end up labelling every Splunk
+  scheduled search as MCP traffic. The panel now filters against
+  `mcp_excluded_users`.
+- **`mcp_rest_clients` composition documented.** The base-searches
+  comment block promised callers could append `earliest=...` to any
+  base macro, but `mcp_rest_clients` ends in `| lookup … | where`
+  (transforming), so an appended `earliest=` lands past the `where` and
+  Splunk rejects it ("Error in 'where' command: The operator at
+  'earliest=-1h' is invalid"). The macro's docstring now states that
+  this one requires time bounds as dispatch parameters, not appended.
+- **MCP Detection dashboard text aligned with the exclusion design.**
+  The "Why this dashboard exists" panel and the dashboard description
+  used to mention catching MCPs that authenticate as a "shared account
+  (e.g. admin)" — that framing now contradicts the exclusion lookup.
+  Rewrites the three places (panel HTML, `<description>` tag, README
+  bullet) to drop the admin example, mention the exclusion lookup, and
+  tell operators how to opt back in if their deployment really does use
+  `admin` as the MCP service account.
 - Heartbeat dashboard cell now XML-escapes `<` in the freshness query
   (was breaking dashboard parse).
 - Heartbeat scheduled search cron is `*/5 * * * *` paired with a 6-min
