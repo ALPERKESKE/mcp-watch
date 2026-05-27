@@ -13,7 +13,7 @@
       <title>Risky queries % · MEDIUM+ (7d)</title>
       <html>
         <div style="text-align:left;margin:-8px 0 -14px 4px;position:relative;z-index:30;">
-          <span title="Risky queries % = share of MCP queries that reach the MEDIUM band or higher (risk_score &#8805; 3), over all MCP queries in the range. 0% = clean.&#10;&#10;Per-query risk_score weights:&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;len(_raw)   +1&#10;no time bound   +0  (detected but not scored: MCP passes time range as API param, not in SPL text)&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Bands: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1 (severity in the Risk band distribution panel)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
+          <span title="Risky queries % = share of MCP queries that reach the MEDIUM band or higher (risk_score &#8805; 3), over all MCP queries in the range. 0% = clean.&#10;&#10;Per-query risk_score weights:&#10;| outputcsv / outputlookup / collect / sendemail / delete   +15  (agent intent: data export or destruction — single fire = CRITICAL)&#10;index=*   +5&#10;dbinspect index=*   +4&#10;wide time window (&#8805;30d)   +3&#10;len(_raw)   +1&#10;no time bound   +0  (detected but not scored: MCP passes time range as API param, not in SPL text)&#10;bonus: off-hours &amp; risky   +2&#10;bonus: &gt;100k rows &amp; risky   +5&#10;&#10;Bands: CRIT &#8805;15 · HIGH &#8805;8 · MED &#8805;3 · LOW &#8805;1 (severity in the Risk band distribution panel)." style="cursor:help;color:#5ca3f7;font-size:17px;font-weight:bold;">&#9432;</span>
         </div>
       </html>
       <single>
@@ -72,10 +72,11 @@
               sum(is_len_raw)          as len_raw,
               sum(is_dbinspect_all)    as dbinspect_all,
               sum(is_no_time_bound)    as no_time_bound,
-              sum(is_overly_wide_time) as wide_time_window
+              sum(is_overly_wide_time) as wide_time_window,
+              sum(is_export_or_delete) as export_or_delete
             | transpose
             | rename column as anti_pattern, "row 1" as hits
-            | eval anti_pattern = case(anti_pattern=="wildcard_index", "index=*", anti_pattern=="len_raw", "len(_raw)", anti_pattern=="dbinspect_all", "dbinspect index=*", anti_pattern=="no_time_bound", "no time bound", anti_pattern=="wide_time_window", "&gt;30d window", true(), anti_pattern)
+            | eval anti_pattern = case(anti_pattern=="wildcard_index", "index=*", anti_pattern=="len_raw", "len(_raw)", anti_pattern=="dbinspect_all", "dbinspect index=*", anti_pattern=="no_time_bound", "no time bound", anti_pattern=="wide_time_window", "&gt;30d window", anti_pattern=="export_or_delete", "| outputcsv / | delete (export/destroy)", true(), anti_pattern)
             | sort - hits</query>
         </search>
         <option name="charting.chart">bar</option>

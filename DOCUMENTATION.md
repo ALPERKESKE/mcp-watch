@@ -43,6 +43,7 @@ Every captured query is scored against five expensive / sloppy SPL patterns (mac
 | `is_overly_wide_time` | has `earliest=` spanning roughly **≥ 30 days** (≥ `-30d`, `-N0w`, `-Nmon`, `-Ny`) | **3** | Huge time windows hammer indexers; usually accidental. |
 | `is_no_time_bound` | has no `earliest=` / `latest=` clause in the SPL | **0** | **Detected and reported, but not scored.** MCP servers pass the search time range as an API parameter (out-of-band from the SPL text), so this would fire on virtually every MCP query and saturate the risk score. Override the weight in `local/macros.conf` if you need it counted for human-SPL traffic. |
 | `is_len_raw` | contains `len(_raw)` | **1** | Forces full `_raw` materialization; a common (mostly human) performance footgun. |
+| `is_export_or_delete` | contains `\| outputcsv`, `\| outputlookup`, `\| collect`, `\| sendemail`, or `\| delete` | **15** | **Agent-intent signal, not an SPL-hygiene one.** Single fire → CRITICAL band on its own. For an MCP service account these commands almost never have a legitimate use: scheduled exports are owned by humans via saved searches, and `\| delete` requires the `delete_by_keyword` capability that an `mcp_agent` role should not have. Pairs with a dedicated severity-5 alert. |
 
 > **v1.1 fix:** `is_no_time_bound` previously matched the literal string `_time` anywhere in the SPL, so a query like `index=_audit | bin _time` falsely cleared the flag. The macro now requires an actual `earliest=` / `latest=` clause. Known regex gaps remain for `is_overly_wide_time` (single-digit weeks ≥ 5w aren't matched; v1.1 TODO) — see `lookups/regex_fixtures.csv` for the documented coverage.
 
@@ -53,8 +54,8 @@ Every captured query is scored against five expensive / sloppy SPL patterns (mac
 Pipe `mcp_risk_score` after `mcp_antipattern_check` to upgrade from a flat flag-sum to a weighted, context-aware score:
 
 ```
-risk_score = (is_wildcard_index*5 + is_dbinspect_all*4 + is_overly_wide_time*3
-              + is_no_time_bound*0 + is_len_raw*1)
+risk_score = (is_export_or_delete*15 + is_wildcard_index*5 + is_dbinspect_all*4
+              + is_overly_wide_time*3 + is_no_time_bound*0 + is_len_raw*1)
            + (is_off_hours ? 2 : 0)              # only if risk_weight > 0
            + (result_count > 100k ? 5 : 0)       # only if risk_weight > 0
 ```
@@ -146,6 +147,7 @@ mcp_rest_calls      ──▶ mcp_rest_path
 
 | Name | Trigger | Severity |
 |---|---|---|
+| `MCP-Watch - Alert - Export or Delete Command Used` | an MCP user runs a search containing `\| outputcsv`, `\| outputlookup`, `\| collect`, `\| sendemail`, or `\| delete` | **5 (critical)** |
 | `MCP-Watch - Alert - Wildcard Index Used` | an MCP user runs a search containing `index=*` | 4 (high) |
 | `MCP-Watch - Alert - Overly Wide Time Range` | an MCP user runs a search with `earliest` spanning > ~30 days | 3 (medium) |
 

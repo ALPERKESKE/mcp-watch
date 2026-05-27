@@ -42,11 +42,18 @@ heartbeats* phase) into a single Splunkbase minor release.
   `mcp_users.csv`, and live "is data flowing?" checks. Open this first
   after install.
 
-#### MCP liveness heartbeats (KV store)
+#### MCP liveness heartbeats with UP / IDLE / STALE
 - New `mcp_heartbeat` KV collection. MCP Overview's top row now shows
-  per-MCP `● UP` / `○ STALE` from this collection, **decoupled from
-  query activity** — an MCP is UP when a fresh heartbeat (≤ 6 min) exists
-  for it; otherwise STALE.
+  per-MCP status with a three-state model layering heartbeat freshness
+  with recent-activity:
+  - **`● UP`** — heartbeat ≤ 6 min old **AND** MCP queries in the last hour.
+  - **`◐ IDLE`** — heartbeat fresh but no MCP queries in the last hour
+    (e.g. IDE open in background, no active conversation).
+  - **`○ STALE`** — no fresh heartbeat. The MCP server itself is down.
+- Two-state (UP/STALE) would have shown an idle agent as UP, hiding the
+  difference between "everything's fine but nothing's happening" and
+  "agent actively working" — useful for triaging "AI side broken" vs
+  "MCP server broken".
 - **Auto-heartbeat for the official Splunk MCP Server**: new scheduled
   report `MCP-Watch - Heartbeat - Official MCP Server` writes a heartbeat
   every 5 min when the official server app is enabled. No setup needed
@@ -54,6 +61,23 @@ heartbeats* phase) into a single Splunkbase minor release.
 - Custom / external MCPs send their own heartbeat (the MCP runs outside
   Splunk, so it is the only reliable liveness signal) — see README for
   the `batch_save` example.
+
+#### `is_export_or_delete` flag + CRITICAL-severity alert
+- New anti-pattern: `| outputcsv`, `| outputlookup`, `| collect`,
+  `| sendemail`, or `| delete` in MCP SPL → flag fires with **weight
+  +15** (single fire reaches CRITICAL band on its own).
+- This flag is categorically different from the others: it captures
+  *agent intent* to write data out (exfil) or destroy data, not "sloppy
+  SPL". For an MCP service account these commands are almost never
+  legitimate — scheduled exports/backups are owned by humans via saved
+  searches, and `| delete` needs the `delete_by_keyword` capability
+  that an `mcp_agent` role should not have.
+- Paired with a dedicated alert
+  **`MCP-Watch - Alert - Export or Delete Command Used`** at
+  **severity 5 (CRITICAL)**, 15-min suppression. Investigates the source
+  agent and the SPL body immediately on a hit.
+- Self-test fixtures added in `lookups/regex_fixtures.csv` (10 rows
+  covering all five command variants + 3 negative cases).
 
 #### Splunkbase metadata polish
 - App icons added (36×36 + 72×72; `appIcon` / `appIconAlt`).

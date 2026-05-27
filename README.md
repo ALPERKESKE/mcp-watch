@@ -96,7 +96,13 @@ Catches MCP/agent clients that v1.0's provenance-only logic missed (custom / com
 
 ## Liveness &amp; heartbeats
 
-The **MCP liveness — heartbeats** panel (first row of *MCP Overview*) shows per-MCP up/down, **independent of query activity** — `● UP` when a fresh heartbeat (≤ 6 min old) exists in the `mcp_heartbeat` KV collection, otherwise `○ STALE`.
+The **MCP liveness — heartbeats** panel (first row of *MCP Overview*) shows per-MCP status using a fresh-heartbeat check in the `mcp_heartbeat` KV collection, layered with a recent-activity check:
+
+- **`● UP`** — heartbeat ≤ 6 min old **AND** at least one MCP query in the last hour. The MCP server is running and the agent is actively using it.
+- **`◐ IDLE`** — heartbeat ≤ 6 min old but **no** MCP queries in the last hour. The MCP server is running but its agent is idle (e.g., Cursor open in the background without an active conversation).
+- **`○ STALE`** — no fresh heartbeat. The MCP server itself is down or has been disconnected.
+
+This separation matters for triage: *all* agents simultaneously IDLE often means the AI tool side is broken (Anthropic outage, IDE crashed), while *one* agent STALE while others are UP usually means that specific MCP server stopped.
 
 - **Official Splunk MCP Server** → auto-heartbeated for you: the scheduled search *MCP-Watch - Heartbeat - Official MCP Server* writes a heartbeat every 5 min while the app is enabled. No setup needed.
 - **Custom / external MCP** → must send its own heartbeat (it runs outside Splunk, so that is the only reliable liveness signal). Have the MCP, or a sidecar next to it, upsert one row every ~60s — for example:
@@ -118,6 +124,7 @@ Each query gets a **risk score** = weighted sum of detected anti-patterns, plus 
 
 | Signal | Weight |
 |--------|:------:|
+| `\| outputcsv` / `\| outputlookup` / `\| collect` / `\| sendemail` / `\| delete` | **+15** |
 | wildcard index (`index=*`) | +5 |
 | `dbinspect index=*` | +4 |
 | overly-wide time window (≥ 30d) | +3 |
@@ -129,7 +136,9 @@ Each query gets a **risk score** = weighted sum of detected anti-patterns, plus 
 
 The headline KPI is **Risky queries %** — the share of queries at the **MEDIUM band or higher** (`risk_score ≥ 3`), bounded 0–100%, lower is better.
 
-> **Note on `is_no_time_bound`:** the flag is still detected (and reported in dashboards for transparency), but its weight is **0** — MCP servers pass the search time range as an API parameter (out-of-band from the SPL text), so the signal would otherwise fire on virtually every MCP query and saturate the score with noise. Override the weight in `local/macros.conf` if you need it counted in a human-SPL context.
+> **`is_export_or_delete` is the only single-fire CRITICAL.** This flag isn't a "sloppy SPL" pattern — it captures *agent intent* to write data out (`| outputcsv`, `| outputlookup`, `| collect`, `| sendemail`) or destroy data (`| delete`). For an MCP service account these commands are almost never legitimate, so one fire alone tips into CRITICAL and triggers the dedicated alert.
+
+> **`is_no_time_bound` has weight 0** — still detected (and reported in dashboards for transparency), but does not contribute to risk. MCP servers pass the search time range as an API parameter (out-of-band from the SPL text), so the signal would otherwise fire on virtually every MCP query and saturate the score with noise. Override the weight in `local/macros.conf` if you need it counted in a human-SPL context.
 
 ---
 
@@ -143,6 +152,7 @@ The headline KPI is **Risky queries %** — the share of queries at the **MEDIUM
 - `MCP-Watch - Heartbeat - Official MCP Server` — auto-heartbeats the official server every 5 min (liveness); writes nothing if that app isn't installed.
 
 **Alerts:**
+- `MCP-Watch - Alert - Export or Delete Command Used` — **severity 5 (CRITICAL)**, fires when an MCP user runs `| outputcsv`, `| outputlookup`, `| collect`, `| sendemail`, or `| delete`. Single occurrence is worth waking someone up.
 - `MCP-Watch - Alert - Wildcard Index Used` — severity 4, fires on `index=*`.
 - `MCP-Watch - Alert - Overly Wide Time Range` — severity 3, fires on > ~30d windows.
 

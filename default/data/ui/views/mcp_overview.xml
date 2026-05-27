@@ -14,16 +14,24 @@
 
   <row>
     <panel>
-      <title>MCP liveness — heartbeats (UP = heartbeat within 6 min)</title>
+      <title>MCP liveness — UP (fresh + active) · IDLE (fresh, no queries last hour) · STALE (no heartbeat ≥ 6 min)</title>
       <table>
         <search>
-          <query>| `mcp_heartbeats` | eval status=if(fresh=1,"● UP","○ STALE"), last_heartbeat=strftime(last_seen,"%Y-%m-%d %H:%M:%S") | table mcp_id status kind host age_seconds last_heartbeat | sort mcp_id</query>
+          <query>| `mcp_heartbeats`
+            | append [ search `mcp_audit_searches` earliest=-1h latest=now | stats count | eval _activity_marker=1 ]
+            | eventstats max(count) as activity_1h
+            | where isnull(_activity_marker)
+            | fillnull value=0 activity_1h
+            | eval status=case(fresh=0,"○ STALE", fresh=1 AND activity_1h>0,"● UP", true(),"◐ IDLE"),
+                   last_heartbeat=strftime(last_seen,"%Y-%m-%d %H:%M:%S")
+            | table mcp_id status kind host age_seconds last_heartbeat
+            | sort mcp_id</query>
           <refresh>30s</refresh>
           <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
         <format type="color" field="status">
-          <colorPalette type="map">{"● UP":#53a051,"○ STALE":#dc4e41}</colorPalette>
+          <colorPalette type="map">{"● UP":#53a051,"◐ IDLE":#f8be34,"○ STALE":#dc4e41}</colorPalette>
         </format>
       </table>
     </panel>

