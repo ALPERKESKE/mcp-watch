@@ -4,7 +4,7 @@
 
 When an AI agent (Claude, Cursor, …) talks to Splunk over the Model Context Protocol, it leaves a rich trail in `_audit` and `_internal` — but no native dashboard surfaces it. MCP-Watch turns those traces into an operations- and governance-ready view: which queries each agent runs, how often, how risky, against which indexes, and which MCP tools each user can reach.
 
-- **Version:** 1.1.0 · **License:** Apache 2.0
+- **Version:** 1.2.0 · **License:** Apache 2.0
 - **What's new since 1.0:**
   - **Multi-signal detection** — also catches **custom / community / non-official MCP servers** (no official provenance, shared account, generic user-agent) via REST-side user-agent matching + endpoint-based tool inference. New **MCP Detection (REST)** dashboard + `mcp_user_agents.csv` lookup.
   - **Unified Access &amp; Tools** — the access model works with the official `mcp_tool_execute` capability AND, where that's absent, falls back to the connecting account's **RBAC + REST-detected tool usage** (so custom MCPs aren't blank).

@@ -1,6 +1,6 @@
 # MCP-Watch for Splunk — App Documentation
 
-> **App ID:** `mcp_watch` · **Version:** 1.0.0 · **License:** Apache 2.0
+> **App ID:** `mcp_watch` · **Version:** 1.2.0 · **License:** Apache 2.0
 > **Compatibility:** Splunk Enterprise 9.x / 10.x and Splunk Cloud · **Dependencies:** none
 
 ---
@@ -111,10 +111,14 @@ mcp_rest_calls      ──▶ mcp_rest_path
 
 > **Design note:** the base macros are *generating searches only* (no transforming commands), so callers can safely add time/user filters; the derived fields (`spl_body`, `uri_path`, `is_*`) come from the `*_extract` / `*_check` macros piped afterwards. (Earlier builds folded `rex` into the base macro, which broke any caller that appended `earliest=` — fixed in this version.)
 
-### 3.2 Lookups
+### 3.2 Lookups and KV collections
 
 - **`lookups/mcp_users.csv`** — columns `user,role,description`. The single source of truth for "who is an agent". Registered as transform `mcp_users` (`transforms.conf`). Admin-writable per `metadata/default.meta`.
 - **`lookups/regex_fixtures.csv`** (v1.1) — columns `test_id,anti_pattern,expected,search,notes`. Drives the **Self-Test** saved search (§3.4) — known-positive and known-negative inputs for every anti-pattern regex, including documented `KNOWN_GAP` rows. Ships in the app so anyone editing the regex can verify they haven't regressed.
+- **`lookups/mcp_user_agents.csv`** (v1.1) — columns `pattern,description`. Wildcard user-agent patterns used by the REST-side detection path to recognise community / custom MCP servers that don't carry the official provenance stamp. Tune for your environment — generic patterns like `python-httpx*` are *opt-in* (commented out by default) so non-MCP automation isn't accidentally flagged.
+- **`lookups/mcp_tool_catalog.csv`** (v1.1) — columns `tool,category`. Static catalog of the 14 known MCP tools (used by the **MCP Access & Tools** dashboard's User × Tool matrix; cross-app KV reads of `mcp_tools_enabled` weren't reliable enough).
+- **`lookups/mcp_tool_denied.csv`** (v1.1) — columns `user,tool`. Per-user governance deny policy; drives the ✗ cells in the access matrix. **Visibility/intent layer only** — the official MCP server does not enforce this; see §… *Access model*.
+- **`mcp_heartbeat` (KV store)** (v1.2) — `collections.conf` collection with fields `mcp_id, last_seen, host, kind, version`. Holds one row per MCP server (official, custom, federation gateway). Upserted by the auto-heartbeat saved search (for the official server) or by the MCP / sidecar itself (for custom MCPs). Drives the **MCP liveness** panel.
 
 ### 3.3 Eventtypes & tags
 
@@ -134,6 +138,7 @@ mcp_rest_calls      ──▶ mcp_rest_path
 | `MCP-Watch - Anti-Pattern Offenders` | `10 * * * *` (hourly) | last 7 days | per-user count + per-pattern breakdown + `score_sum` + the offending SPL bodies |
 | `MCP-Watch - REST Endpoint Distribution` | `15 * * * *` (hourly) | last 24 h | top 30 REST `uri_path`s the agents called |
 | `MCP-Watch - Top SPLs` | `20 * * * *` (hourly) | last 24 h | top 20 most-frequent `spl_body`s + last-seen time |
+| `MCP-Watch - Heartbeat - Official MCP Server` *(v1.2)* | `*/5 * * * *` (every 5 min) | – | Upserts a row into `mcp_heartbeat` KV for `mcp_id=official` whenever the official Splunk MCP Server app is enabled. Paired with a 6-min freshness threshold in the dashboard (so AppInspect doesn't flag the cron as "gratuitous"). Writes nothing if the official server isn't installed. |
 
 **Alerts** (real-time-ish, run every 5 minutes over the last 15 minutes, 30-minute suppression, tracked):
 
@@ -154,16 +159,20 @@ Each alert returns `_time, user, spl_body` for the offending query. Hook them to
 
 ## 4. The dashboards
 
-Navigation (`MCP-Watch` app menu): **MCP Overview** (default) · **Activity Timeline** · **Quality & Hygiene** · **Reports** (auto-lists the four reports above) · **Search**.
+Navigation (`MCP-Watch` app menu): **Getting Started** · **MCP Overview** (default) · **Activity Timeline** · **Quality & Hygiene** · **MCP Access & Tools** · **MCP Detection (REST)** · **Reports** · **Search**.
+
+### 4.0 Getting Started (`getting_started`) — *new in v1.1*
+In-app onboarding for new installs. Shows current configuration (which users are in `mcp_users.csv`, audit/internal macros), live "is data flowing?" checks (count of MCP search events seen in the last 24 h), and inline instructions for filling the lookup. Open this first after install.
 
 ### 4.1 MCP Overview (`mcp_overview`)
-At-a-glance picture of the last 24 hours. Single base search: `` `mcp_audit_searches` earliest=-24h latest=now | `mcp_spl_extract` ``.
-- **Queries (last 24h)** — total query count.
+At-a-glance picture of the last 24 hours. Top row (v1.2): **MCP liveness — heartbeats** (per-MCP `● UP` / `○ STALE` from the `mcp_heartbeat` KV collection, decoupled from query activity, freshness ≤ 6 min). Following row, 5 KPIs in a single line:
+- **Last MCP activity** — minutes since the last MCP/agent REST call (green < 15m, amber, red).
+- **Queries (last 24h)** — total SPL queries run by MCP users.
 - **Active MCP users** — distinct MCP accounts seen.
-- **Anti-pattern hits (24h)** — `sum(antipattern_score)` over the window, colour-coded green/amber/red.
-- **Unique SPL bodies** — distinct query texts (a proxy for "how varied is the agent's work").
-- **Query volume — 15-min buckets** — stacked column `timechart span=15m count by user`.
-- **Top 5 SPL bodies (24h)** — the five most-run query texts. *(These are the agent's actual queries — if you see unfamiliar field names here, that's the monitored content, not the app.)*
+- **Risky queries % · MEDIUM+ (24h)** *(v1.2)* — share of MCP queries that reach `risk_band` ≥ MEDIUM (`risk_score ≥ 3`). Bounded 0–100, lower is better. Replaces the legacy unbounded "Risk score sum" KPI.
+- **Unique SPL bodies** — distinct query texts (deduplication signal).
+
+Below: **Query volume — 15-min buckets** timechart + **Top 5 SPL bodies (24h)**.
 
 ### 4.2 Activity Timeline (`activity_timeline`)
 Drill into individual queries and the REST calls behind them. Inputs: a time-range picker and an **MCP user** dropdown (populated from `mcp_users.csv`, default = all). Base search: `` `mcp_audit_searches` user="$user_filter$" | `mcp_spl_extract` ``.
@@ -173,13 +182,30 @@ Drill into individual queries and the REST calls behind them. Inputs: a time-ran
 - **REST status code mix** — bar of HTTP status codes returned to the agent.
 
 ### 4.3 Quality & Hygiene (`quality_hygiene`)
-Does the agent write good SPL? Base search (7 days): `` `mcp_audit_searches` earliest=-7d latest=now | `mcp_spl_extract` | `mcp_antipattern_check` ``.
-- **Anti-pattern hits (7d)** — `sum(antipattern_score)`.
+Does the agent write good SPL? Base search (7 days): `` `mcp_audit_searches` earliest=-7d latest=now | `mcp_spl_extract` | `mcp_antipattern_check` | `mcp_risk_score` ``.
+- **Risky queries % · MEDIUM+ (7d)** *(v1.2)* — same definition as on MCP Overview, 7-day window. Hover the ⓘ for the formula.
 - **Queries with at least one hit** — count of queries where `antipattern_score > 0`.
-- **Worst offender (user)** — the account with the highest cumulative score.
+- **Worst offender (user)** — the account with the highest cumulative risk.
+- **Highest risk band (7d)** — worst single-query band reached (LOW…CRITICAL).
 - **Anti-pattern breakdown** — bar chart of hit counts per pattern (`index=*`, `len(_raw)`, `dbinspect index=*`, `no time bound`, `>30d window`).
-- **Hits by user** — cumulative score per user.
-- **Top offending queries** — the worst `spl_body`s by max score then count (top 20, wrapped).
+- **Hits by user** — cumulative risk per user.
+- **Risk band distribution (7d)** — how many queries fell into NONE / LOW / MEDIUM / HIGH / CRITICAL.
+- **Off-hours risk events (7d)** — risky queries run before 07:00 / after 19:00.
+- **Top offending queries** — the worst `spl_body`s by `risk_score` then count, with band + user.
+
+### 4.4 MCP Access & Tools (`mcp_access`) — *new in v1.1, unified in v1.1*
+Who can do what — **unified for official + custom MCPs**. With the official Splunk MCP Server, uses the `mcp_tool_execute` capability + `mcp_tool_catalog.csv`. Without it (community / federation MCPs), falls back to the connecting account's RBAC + REST-detected tool usage so the dashboard never goes blank.
+- **MCP accounts** — accounts treated as MCP clients (via the `mcp_tool_execute` capability **or** user-agent detection), with their roles.
+- **User × Tool matrix** — per account × tool. ✓ granted / ✗ denied (official, from `mcp_tool_denied.csv`) and ✓ used (custom, inferred from REST endpoints). `chart limit=0` so all 14 catalog tools fit as columns instead of collapsing into "OTHER".
+- **Tool usage by account** — stacked chart of inferred tool usage per account.
+- **Searchable index scope per MCP account** — the real data boundary — which indexes each MCP account's roles may search. Driven by `rest /services/authorization/roles`, so the viewer needs `list_users` / REST access (admin / power / sc_admin).
+
+### 4.5 MCP Detection (REST) (`mcp_detection_rest`) — *new in v1.1*
+Catches MCP / agent clients that v1.0's provenance-only logic missed (custom / community MCP servers, federation gateways like the Splunk cluster MCP).
+- **MCP / agent clients detected by user-agent** — `splunkd_access` clients whose user-agent matches `mcp_user_agents.csv` — request count, distinct endpoints, users.
+- **REST activity by inferred tool** — endpoint-based fallback tool attribution (e.g. `/search/jobs` → `run_query`) when provenance is absent.
+- **Top REST endpoints from MCP / agent clients** — which REST endpoints non-official clients hit.
+- **Detection signal coverage** — official-provenance clients vs. those detected by user-agent only.
 
 ---
 
@@ -239,12 +265,14 @@ Open Splunk Web → Search & Reporting → Reports, run `MCP-Watch - Self-Test -
 
 ## 8. Roadmap
 
-Authoritative roadmap lives in `MCPApp.md §13`. Short form:
+Authoritative roadmap lives in `MCPApp.md §13` (dev workspace; not shipped in the app). Short form:
 
-- **v1.1 P0 — SHIPPED:** weighted Risk Score (this section), `risk_band`, `is_high_risk_query` eventtype, regex fixtures + Self-Test saved search, `is_no_time_bound` regex bug fix.
-- **v1.1 P1–P6 (next):** Data Exfiltration detection (high `result_count` + no aggregation); Sensitive Index lookup (`sensitive_indexes.csv`) + ×2 risk multiplier + Governance & Audit dashboard; `setup.json` Universal Setup + in-app Manage MCP Users dashboard; Failure & Recovery dashboard (`info=failed`); Performance Killers regroup (`is_unbounded_join`, `is_values_star`, etc.); prompt/SPL injection session-scope-drift signal.
-- **v1.2:** **Sessionization** (group an agent's queries into logical investigation sessions via `streamstats time_window=5m` — not `transaction`); Performance Impact (CPU-seconds / scan_count from `metrics.log` + `_introspection` — no $ figures); Human vs AI comparative baseline (distribution view, not single-number claims).
-- **v2.0:** KV Store migration (only if user list grows beyond ~25 rows); multi-MCP-server typology; webhook actions; manual Anthropic token-cost overlay.
+- **v1.0 — SHIPPED (Splunkbase, 2026-05-27).** 3 dashboards (MCP Overview, Activity Timeline, Quality & Hygiene), weighted Risk Score + `risk_band`, anti-pattern detection, 4 reports + 2 alerts, regex fixtures + Self-Test, eventtypes.
+- **v1.1 — SHIPPED (in repo).** Multi-signal MCP detection (user-agent + endpoint inference) for custom/community MCPs · new **MCP Detection (REST)** dashboard · unified **MCP Access & Tools** dashboard (works with or without `mcp_tool_execute` capability) · **Getting Started** dashboard for in-app onboarding · RBAC-based access fallback · app icons · Splunkbase metadata (support contact, disclaimers).
+- **v1.2 — SHIPPED (in repo, this release).** **MCP liveness heartbeats** (KV `mcp_heartbeat`) decoupled from query activity · **auto-heartbeat saved search** for the official server (every 5 min) · **"Risky queries %" MEDIUM+ KPI** (bounded 0–100; replaces unbounded risk-score sum) · MCP Overview top row recomposed (MCP liveness first row, 5 KPIs in one line, status badge removed).
+- **v1.3 (next):** Data Exfiltration detection (high `result_count` + no aggregation); Sensitive Index lookup (`sensitive_indexes.csv`) + ×2 risk multiplier + Governance & Audit dashboard; `setup.json` Universal Setup + in-app Manage MCP Users dashboard; Failure & Recovery dashboard (`info=failed`); Performance Killers regroup (`is_unbounded_join`, `is_values_star`, etc.); prompt/SPL injection session-scope-drift signal.
+- **v1.4:** **Sessionization** (group an agent's queries into logical investigation sessions via `streamstats time_window=5m` — not `transaction`); Performance Impact (CPU-seconds / scan_count from `metrics.log` + `_introspection` — no $ figures); Human vs AI comparative baseline (distribution view, not single-number claims).
+- **v2.0:** KV Store migration of `mcp_users` (only if user list grows beyond ~25 rows); multi-MCP-server typology; webhook actions; manual Anthropic token-cost overlay.
 
 ---
 
